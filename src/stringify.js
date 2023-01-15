@@ -43,7 +43,7 @@ module.exports = (initialValue, options) => {
       indent: 0,
       keyValueIndent: 0,
     },
-    options
+    options,
   );
 
   const newLine = options.newLine ? '\n' : '';
@@ -76,7 +76,7 @@ module.exports = (initialValue, options) => {
       }
 
       values = values.join(`,${newLine}${valueIndent}`);
-      return values.length ? `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` : `{}`;
+      return values.length ? `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` : '{}';
     }
 
     const {value: newValue} = replacer(null, value);

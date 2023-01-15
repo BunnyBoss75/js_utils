@@ -1,4 +1,4 @@
-export class Cache {
+class Cache {
   constructor(options) {
     // TODO
     options = options || {};
@@ -135,7 +135,7 @@ export class Cache {
   }
 }
 
-export class SafeCache extends Cache {
+class SafeCache extends Cache {
   constructor(options) {
     super(options);
   }
@@ -146,4 +146,9 @@ export class SafeCache extends Cache {
       throw new Error('Cache key must be a string');
     }
   }
+}
+
+module.exports = {
+  Cache,
+  SafeCache,
 }
