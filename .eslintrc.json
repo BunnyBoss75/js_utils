@@ -1,12 +1,12 @@
-module.exports = {
-  parserOptions: {
-    ecmaVersion: 2019,
+{
+  "parserOptions": {
+    "ecmaVersion": 2019
   },
-  rules: {
+  "rules": {
     "camelcase": 1,
     "comma-dangle": [
       1,
-      "always-multiline",
+      "always-multiline"
     ],
     "function-paren-newline": 1,
     "max-len": [
@@ -14,17 +14,18 @@ module.exports = {
       {
         "code": 120,
         "tabWidth": 2,
-        "ignoreUrls": true,
-      },
+        "ignoreUrls": true
+      }
     ],
+    "indent": [2, 2, {"SwitchCase": 1}],
     "no-unused-expressions": 1,
     "operator-linebreak": [
       2,
-      "after",
+      "after"
     ],
     "quotes": [
       1,
-      "single",
+      "single"
     ],
     "prefer-promise-reject-errors": 1,
     "eqeqeq": 1,
