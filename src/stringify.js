@@ -66,10 +66,11 @@ module.exports = (initialValue, options) => {
       for (const key of Reflect.ownKeys(value)) {
         if (Object.hasOwnProperty.call(value, key)) {
           let {key: newKey, value: newValue} = replacer(key, value[key]);
-          if (typeof newValue !== 'string') {
+          if (typeof newValue === 'object') {
             newValue = builder(newValue, valueIndent);
           }
-          if (typeof newValue === 'string') {
+
+          if (typeof newValue !== 'undefined' && typeof newValue !== 'function') {
             values.push(`"${newKey}":${keyValueIndent}${newValue}`);
           }
         }
