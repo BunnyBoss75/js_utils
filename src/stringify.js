@@ -45,6 +45,7 @@ module.exports = (initialValue, options) => {
       newLine: false,
       indent: 0,
       keyValueIndent: 0,
+      ignoreCycles: false,
     },
     options,
   );
@@ -52,25 +53,49 @@ module.exports = (initialValue, options) => {
   const newLine = options.newLine ? '\n' : '';
   const indent = ' '.repeat(options.indent);
   const keyValueIndent = ' '.repeat(options.keyValueIndent);
-  const {replacer} = options;
+  const {replacer, ignoreCircular, comparator} = options;
+
+  const seen = new Map();
 
   const builder = (value, currentIndent) => {
     const valueIndent = currentIndent + indent;
+
     if (Array.isArray(value)) {
+      if (seen.has(value)) {
+        if (ignoreCircular) {
+          return '"__cycle__"';
+        } else {
+          throw new Error('Cycle reference during stringify object');
+        }
+      }
+      seen.set(value);
+
       const values = value
         .map(el => replacer(null, el).value)
         .map(el => typeof el === 'object' ? builder(el, valueIndent) : el)
         .filter(el => typeof el !== 'undefined' && typeof el !== 'function')
         .join(`,${newLine}${valueIndent}`);
+
+      seen.delete(value);
+
       return `[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`;
     }
 
     if (value && typeof value === 'object') {
+      if (seen.has(value)) {
+        if (ignoreCircular) {
+          return '"__cycle__"';
+        } else {
+          throw new Error('Cycle reference during stringify object');
+        }
+      }
+      seen.set(value);
+
       let values = [];
 
       let keys = Reflect.ownKeys(value);
-      if (options.comparator) {
-        keys = keys.sort(options.comparator);
+      if (comparator) {
+        keys = keys.sort(comparator);
       }
 
       for (const key of keys) {
@@ -85,6 +110,8 @@ module.exports = (initialValue, options) => {
           }
         }
       }
+
+      seen.delete(value);
 
       values = values.join(`,${newLine}${valueIndent}`);
       return values.length ? `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` : '{}';
