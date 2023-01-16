@@ -1,3 +1,5 @@
+const microUtils = require('./microUtils');
+
 const defaultReplacer = (key, value) => {
   if (typeof key !== 'string' && key !== null) {
     if (key.toString) {
@@ -39,6 +41,7 @@ module.exports = (initialValue, options) => {
   options = Object.assign(
     {
       replacer: defaultReplacer,
+      comparator: microUtils.defaultStringSymbolCompare,
       newLine: false,
       indent: 0,
       keyValueIndent: 0,
@@ -63,7 +66,13 @@ module.exports = (initialValue, options) => {
 
     if (value && typeof value === 'object') {
       let values = [];
-      for (const key of Reflect.ownKeys(value)) {
+
+      let keys = Reflect.ownKeys(value);
+      if (options.comparator) {
+        keys = keys.sort(options.comparator);
+      }
+
+      for (const key of keys) {
         if (Object.hasOwnProperty.call(value, key)) {
           let {key: newKey, value: newValue} = replacer(key, value[key]);
           if (typeof newValue === 'object') {
