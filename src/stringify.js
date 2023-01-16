@@ -14,6 +14,9 @@ const defaultReplacer = (key, value) => {
   }
 
   switch (typeof value) {
+    case 'string':
+      value = `"${value}"`;
+      break;
     case 'symbol':
       value = value.toString();
       break;
@@ -25,7 +28,7 @@ const defaultReplacer = (key, value) => {
       value = isFinite(value) ? value.toString() : undefined;
       break;
     case 'boolean':
-      String(value);
+      value = String(value);
       break;
     case 'object':
       if (value === null) {
