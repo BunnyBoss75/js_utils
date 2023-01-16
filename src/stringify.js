@@ -58,8 +58,9 @@ module.exports = (initialValue, options) => {
     const valueIndent = currentIndent + indent;
     if (Array.isArray(value)) {
       const values = value
-        .map(el => builder(el, valueIndent))
-        .filter(el => typeof el !== 'undefined')
+        .map(el => replacer(null, el).value)
+        .map(el => typeof el === 'object' ? builder(el, valueIndent) : el)
+        .filter(el => typeof el !== 'undefined' && typeof el !== 'function')
         .join(`,${newLine}${valueIndent}`);
       return `[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`;
     }
