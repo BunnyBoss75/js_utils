@@ -53,6 +53,7 @@ module.exports = (initialValue, options) => {
       indent: 0,
       keyValueIndent: 0,
       ignoreCycles: false,
+      ignoreSymbols: false,
     },
     options,
   );
@@ -60,7 +61,7 @@ module.exports = (initialValue, options) => {
   const newLine = options.newLine ? '\n' : '';
   const indent = ' '.repeat(options.indent);
   const keyValueIndent = ' '.repeat(options.keyValueIndent);
-  const {replacer, ignoreCircular, comparator} = options;
+  const {replacer, ignoreCircular, ignoreSymbols, comparator} = options;
 
   const seen = new Map();
 
@@ -101,6 +102,9 @@ module.exports = (initialValue, options) => {
       let values = [];
 
       let keys = Reflect.ownKeys(value);
+      if (ignoreSymbols) {
+        keys = keys.filter(key => typeof key === 'string');
+      }
       if (comparator) {
         keys = keys.sort(comparator);
       }
