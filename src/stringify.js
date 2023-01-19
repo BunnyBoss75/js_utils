@@ -66,13 +66,15 @@ module.exports = (initialValue, options) => {
 
   const seen = new Map();
 
-  const builder = (value, currentIndent) => {
+  const builder = (k, v, currentIndent) => {
     const valueIndent = currentIndent + indent;
+
+    const {value, key} = replacer(k, v);
 
     if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCircular) {
-          return '"__cycle__"';
+          return {key, value: '"__cycle__"'};
         } else {
           throw new Error('Cycle reference during stringify object');
         }
@@ -80,20 +82,19 @@ module.exports = (initialValue, options) => {
       seen.set(value);
 
       const values = value
-        .map(el => replacer(null, el).value)
-        .map(el => typeof el === 'object' ? builder(el, valueIndent) : el)
-        .filter(el => typeof el !== 'undefined' && typeof el !== 'function')
+        .map(el => (builder(null, el, valueIndent) || {}).value)
+        .filter(el => typeof el !== 'undefined')
         .join(`,${newLine}${valueIndent}`);
 
       seen.delete(value);
 
-      return `[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`;
+      return {key, value:`[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`};
     }
 
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
         if (ignoreCircular) {
-          return '"__cycle__"';
+          return {key, value: '"__cycle__"'};
         } else {
           throw new Error('Cycle reference during stringify object');
         }
@@ -110,14 +111,11 @@ module.exports = (initialValue, options) => {
         keys = keys.sort(comparator);
       }
 
-      for (const key of keys) {
-        if (Object.hasOwnProperty.call(value, key)) {
-          let {key: newKey, value: newValue} = replacer(key, value[key]);
-          if (typeof newValue === 'object') {
-            newValue = builder(newValue, valueIndent);
-          }
+      for (const valueKey of keys) {
+        if (Object.hasOwnProperty.call(value, valueKey)) {
+          const {key: newKey, value: newValue} = builder(valueKey, value[valueKey], valueIndent) || {};
 
-          if (typeof newValue !== 'undefined' && typeof newValue !== 'function') {
+          if (typeof newValue !== 'undefined') {
             values.push(`"${newKey}":${keyValueIndent}${newValue}`);
           }
         }
@@ -125,14 +123,17 @@ module.exports = (initialValue, options) => {
 
       seen.delete(value);
 
-      return values.length ?
-        `{${newLine}${valueIndent}${values.join(`,${newLine}${valueIndent}`)}${newLine}${currentIndent}}` :
-        '{}';
+      return {
+        key,
+        value: values.length ?
+          `{${newLine}${valueIndent}${values.join(`,${newLine}${valueIndent}`)}${newLine}${currentIndent}}` :
+          '{}',
+      };
     }
 
-    const {value: newValue} = replacer(null, value);
-    return newValue === undefined ? undefined : `${newValue}`;
+    return value === undefined ? undefined : {key, value: `${value}`};
   };
 
-  return builder(initialValue, '');
+  const {value = ''} = builder(null, initialValue, '') || {};
+  return value;
 };
