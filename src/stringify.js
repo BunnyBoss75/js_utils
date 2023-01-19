@@ -18,6 +18,7 @@ const defaultReplacer = (key, value) => {
       value = `"${value}"`;
       break;
     case 'symbol':
+    case 'bigint':
       value = value.toString();
       break;
     case 'function':
