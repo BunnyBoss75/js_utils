@@ -34,7 +34,10 @@ const defaultReplacer = (key, value) => {
     case 'object':
       if (value === null) {
         value = 'null';
+      } else if (value instanceof RegExp) {
+        value = `"RegExp(${value.toString()})"`;
       }
+
       break;
   }
 
