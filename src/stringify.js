@@ -15,6 +15,7 @@ const defaultReplacer = (key, value) => {
 
   switch (typeof value) {
     case 'string':
+      // TODO: escape sequence
       value = `"${value}"`;
       break;
     case 'symbol':
@@ -124,8 +125,9 @@ module.exports = (initialValue, options) => {
 
       seen.delete(value);
 
-      values = values.join(`,${newLine}${valueIndent}`);
-      return values.length ? `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` : '{}';
+      return values.length ?
+        `{${newLine}${valueIndent}${values.join(`,${newLine}${valueIndent}`)}${newLine}${currentIndent}}` :
+        '{}';
     }
 
     const {value: newValue} = replacer(null, value);
