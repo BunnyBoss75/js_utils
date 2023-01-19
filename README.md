@@ -10,7 +10,8 @@ and write my own implementations based on them.
 
 Implementation of JSON.stringify with support for Symbol
 <br>TODO: improve performance, add stable sort for object keys
-
+* https://github.com/ljharb/json-stable-stringify
+* https://github.com/ljharb/jsonify
 
 ## LRU Cache (in development)
 
