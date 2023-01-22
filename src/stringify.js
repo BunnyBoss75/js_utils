@@ -9,9 +9,9 @@ const defaultReplacer = (key, value) => {
     }
   }
 
-  if (value && typeof value.toJSON === 'function') {
-    value = value.toJSON();
-  }
+  // if (value && typeof value.toJSON === 'function') {
+  //   value = value.toJSON();
+  // }
 
   switch (typeof value) {
     case 'string':
@@ -22,7 +22,6 @@ const defaultReplacer = (key, value) => {
     case 'bigint':
       value = value.toString();
       break;
-    case 'function':
     case 'undefined':
       value = undefined;
       break;
@@ -53,6 +52,7 @@ const defaultOptions = {
   keyValueIndent: 0,
   ignoreCycles: false,
   ignoreSymbols: false,
+  fullPrototypeChain: false,
 }
 
 const stringify = (initialValue, options) => {
@@ -64,7 +64,7 @@ const stringify = (initialValue, options) => {
   const newLine = options.newLine ? '\n' : '';
   const indent = ' '.repeat(options.indent);
   const keyValueIndent = ' '.repeat(options.keyValueIndent);
-  const {replacer, ignoreCycles, ignoreSymbols, comparator} = options;
+  const {replacer, ignoreCycles, ignoreSymbols, comparator, fullPrototypeChain} = options;
 
   const seen = new Set();
 
@@ -93,7 +93,7 @@ const stringify = (initialValue, options) => {
       return {key, value:`[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`};
     }
 
-    if (value && typeof value === 'object') {
+    if (value && typeof value === 'object' || typeof value === 'function') {
       if (seen.has(value)) {
         if (ignoreCycles) {
           return {key, value: '"__cycle__"'};
@@ -106,6 +106,9 @@ const stringify = (initialValue, options) => {
       let values = [];
 
       let keys = Reflect.ownKeys(value);
+      keys.push('constructor')
+      keys.push('__proto__')
+      keys = [...new Set(keys)];
       if (ignoreSymbols) {
         keys = keys.filter(key => typeof key === 'string');
       }
@@ -114,8 +117,14 @@ const stringify = (initialValue, options) => {
       }
 
       for (const valueKey of keys) {
-        if (Object.hasOwnProperty.call(value, valueKey)) {
-          const {key: newKey, value: newValue} = builder(valueKey, value[valueKey], valueIndent) || {};
+        if (Object.hasOwnProperty.call(value, valueKey) || fullPrototypeChain) {
+          let tmp;
+          try {
+            tmp = value[valueKey];
+          } catch (e) {
+            // for case get property arguments from function
+          }
+          const {key: newKey, value: newValue} = builder(valueKey, tmp, valueIndent) || {};
 
           if (typeof newValue !== 'undefined') {
             values.push(`"${newKey}":${keyValueIndent}${newValue}`);
