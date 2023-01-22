@@ -45,26 +45,28 @@ const defaultReplacer = (key, value) => {
   return {key, value};
 };
 
-module.exports = (initialValue, options) => {
-  options = Object.assign(
-    {
-      replacer: defaultReplacer,
-      comparator: microUtils.defaultStringSymbolCompare,
-      newLine: false,
-      indent: 0,
-      keyValueIndent: 0,
-      ignoreCycles: false,
-      ignoreSymbols: false,
-    },
-    options,
-  );
+const defaultOptions = {
+  replacer: defaultReplacer,
+  comparator: microUtils.defaultStringSymbolCompare,
+  newLine: false,
+  indent: 0,
+  keyValueIndent: 0,
+  ignoreCycles: false,
+  ignoreSymbols: false,
+}
+
+const stringify = (initialValue, options) => {
+  options = {
+    ...defaultOptions,
+    ...options,
+  };
 
   const newLine = options.newLine ? '\n' : '';
   const indent = ' '.repeat(options.indent);
   const keyValueIndent = ' '.repeat(options.keyValueIndent);
-  const {replacer, ignoreCircular, ignoreSymbols, comparator} = options;
+  const {replacer, ignoreCycles, ignoreSymbols, comparator} = options;
 
-  const seen = new Map();
+  const seen = new Set();
 
   const builder = (k, v, currentIndent) => {
     const valueIndent = currentIndent + indent;
@@ -73,13 +75,13 @@ module.exports = (initialValue, options) => {
 
     if (Array.isArray(value)) {
       if (seen.has(value)) {
-        if (ignoreCircular) {
+        if (ignoreCycles) {
           return {key, value: '"__cycle__"'};
         } else {
           throw new Error('Cycle reference during stringify object');
         }
       }
-      seen.set(value);
+      seen.add(value);
 
       const values = value
         .map(el => (builder(null, el, valueIndent) || {}).value)
@@ -93,13 +95,13 @@ module.exports = (initialValue, options) => {
 
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
-        if (ignoreCircular) {
+        if (ignoreCycles) {
           return {key, value: '"__cycle__"'};
         } else {
           throw new Error('Cycle reference during stringify object');
         }
       }
-      seen.set(value);
+      seen.add(value);
 
       let values = [];
 
@@ -136,4 +138,10 @@ module.exports = (initialValue, options) => {
 
   const {value = ''} = builder(null, initialValue, '') || {};
   return value;
+};
+
+module.exports = {
+  stringify,
+  defaultOptions,
+  defaultReplacer,
 };

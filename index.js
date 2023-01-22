@@ -1,4 +1,4 @@
 module.exports = {
-    Cache: require('./src/lru_cache'),
-    stringify: require('./src/stringify'),
+  Cache: require('./src/lru_cache'),
+  stringify: require('./src/stringify'),
 };
