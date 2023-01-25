@@ -66,6 +66,8 @@ const stringify = (initialValue, options) => {
   const keyValueIndent = ' '.repeat(options.keyValueIndent);
   const {replacer, ignoreCycles, ignoreSymbols, comparator} = options;
 
+  const getKeys = ignoreSymbols ? Object.keys : Reflect.ownKeys;
+
   const seen = new Set();
 
   const builder = (k, v, currentIndent) => {
@@ -74,6 +76,10 @@ const stringify = (initialValue, options) => {
     const {value, key} = replacer(k, v);
 
     if (Array.isArray(value)) {
+      if (!value.length) {
+        return {key, value: '[]'};
+      }
+
       if (seen.has(value)) {
         if (ignoreCycles) {
           return {key, value: '"__cycle__"'};
@@ -85,15 +91,19 @@ const stringify = (initialValue, options) => {
 
       const values = value
         .map(el => (builder(null, el, valueIndent) || {}).value)
-        .filter(el => typeof el !== 'undefined')
         .join(`,${newLine}${valueIndent}`);
 
       seen.delete(value);
 
-      return {key, value:`[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`};
+      return {key, value: `[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`};
     }
 
     if (value && typeof value === 'object') {
+      let keys = getKeys(value);
+      if (!keys.length) {
+        return {key, value: '{}'};
+      }
+
       if (seen.has(value)) {
         if (ignoreCycles) {
           return {key, value: '"__cycle__"'};
@@ -103,33 +113,27 @@ const stringify = (initialValue, options) => {
       }
       seen.add(value);
 
-      let values = [];
-
-      let keys = Reflect.ownKeys(value);
-      if (ignoreSymbols) {
-        keys = keys.filter(key => typeof key === 'string');
-      }
       if (comparator) {
         keys = keys.sort(comparator);
       }
 
-      for (const valueKey of keys) {
-        if (Object.hasOwnProperty.call(value, valueKey)) {
-          const {key: newKey, value: newValue} = builder(valueKey, value[valueKey], valueIndent) || {};
+      const values = keys
+        .map(valueKey => {
+          if (Object.hasOwnProperty.call(value, valueKey)) {
+            const {key: newKey, value: newValue} = builder(valueKey, value[valueKey], valueIndent) || {};
 
-          if (typeof newValue !== 'undefined') {
-            values.push(`"${newKey}":${keyValueIndent}${newValue}`);
+            if (newValue !== undefined) {
+              return `"${newKey}":${keyValueIndent}${newValue}`;
+            }
           }
-        }
-      }
+        })
+        .join(`,${newLine}${valueIndent}`);
 
       seen.delete(value);
 
       return {
         key,
-        value: values.length ?
-          `{${newLine}${valueIndent}${values.join(`,${newLine}${valueIndent}`)}${newLine}${currentIndent}}` :
-          '{}',
+        value: `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}`,
       };
     }
 
