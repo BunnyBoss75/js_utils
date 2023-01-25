@@ -70,19 +70,16 @@ const stringify = (initialValue, options) => {
 
   const seen = new Set();
 
-  const builder = (k, v, currentIndent) => {
-    const valueIndent = currentIndent + indent;
-
+  const builder = (k, v, currentIndent, addKey) => {
     const {value, key} = replacer(k, v);
 
-    if (Array.isArray(value)) {
-      if (!value.length) {
-        return {key, value: '[]'};
-      }
+    const valueIndent = currentIndent + indent;
+    const keyString = addKey ? `"${key}":${keyValueIndent}` : '';
 
+    if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          return {key, value: '"__cycle__"'};
+          return keyString + '"__cycle__"';
         } else {
           throw new Error('Cycle reference during stringify object');
         }
@@ -90,58 +87,49 @@ const stringify = (initialValue, options) => {
       seen.add(value);
 
       const values = value
-        .map(el => (builder(null, el, valueIndent) || {}).value)
+        .map(el => builder(null, el, valueIndent, false))
+        .filter(el => el !== undefined)
         .join(`,${newLine}${valueIndent}`);
 
       seen.delete(value);
 
-      return {key, value: `[${newLine}${valueIndent}${values}${newLine}${currentIndent}]`};
+      return values.length ?
+        `${keyString}[${newLine}${valueIndent}${values}${newLine}${currentIndent}]` :
+        `${keyString}[]`;
     }
 
     if (value && typeof value === 'object') {
-      let keys = getKeys(value);
-      if (!keys.length) {
-        return {key, value: '{}'};
-      }
-
       if (seen.has(value)) {
         if (ignoreCycles) {
-          return {key, value: '"__cycle__"'};
+          return keyString + '"__cycle__"';
         } else {
           throw new Error('Cycle reference during stringify object');
         }
       }
       seen.add(value);
 
+      let keys = getKeys(value);
       if (comparator) {
         keys = keys.sort(comparator);
       }
 
       const values = keys
-        .map(valueKey => {
-          if (Object.hasOwnProperty.call(value, valueKey)) {
-            const {key: newKey, value: newValue} = builder(valueKey, value[valueKey], valueIndent) || {};
-
-            if (newValue !== undefined) {
-              return `"${newKey}":${keyValueIndent}${newValue}`;
-            }
-          }
-        })
+        .map(valueKey => Object.hasOwnProperty.call(value, valueKey) ?
+          builder(valueKey, value[valueKey], valueIndent, true) : undefined)
+        .filter(el => el !== undefined)
         .join(`,${newLine}${valueIndent}`);
 
       seen.delete(value);
 
-      return {
-        key,
-        value: `{${newLine}${valueIndent}${values}${newLine}${currentIndent}}`,
-      };
+      return values.length ?
+        `${keyString}{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` :
+        `${keyString}{}`;
     }
 
-    return value === undefined ? undefined : {key, value: `${value}`};
+    return value === undefined ? undefined : keyString + `${value}`;
   };
 
-  const {value = ''} = builder(null, initialValue, '') || {};
-  return value;
+  return builder(null, initialValue, '', false) || '';
 };
 
 module.exports = {
