@@ -70,38 +70,52 @@ const stringify = (initialValue, options) => {
 
   const seen = new Set();
 
-  const builder = (k, v, currentIndent, addKey) => {
-    const {value, key} = replacer(k, v);
+  let result = '';
+
+  const builder = (k, v, currentIndent, addKey, comma) => {
+    const {key, value} = replacer(k, v);
 
     const valueIndent = currentIndent + indent;
-    const keyString = addKey ? `"${key}":${keyValueIndent}` : '';
+    const keyString = (comma ? ',' : '') + newLine + currentIndent + (addKey ? `"${key}":${keyValueIndent}` : '');
 
     if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          return keyString + '"__cycle__"';
+          result += keyString + '"__cycle__"';
+          return true;
         } else {
           throw new Error('Cycle reference during stringify object');
         }
       }
       seen.add(value);
 
-      const values = value
-        .map(el => builder(null, el, valueIndent, false))
-        .filter(el => el !== undefined)
-        .join(`,${newLine}${valueIndent}`);
+      result += keyString + '[';
+
+      let isFirst = true;
+      for (const el of value) {
+        if (builder(null, el, valueIndent, false, !isFirst)) {
+          if (isFirst) {
+            isFirst = false;
+          }
+        }
+      }
+
+      if (isFirst) {
+        result += ']';
+      } else {
+        result += `${newLine}${currentIndent}]`;
+      }
 
       seen.delete(value);
 
-      return values.length ?
-        `${keyString}[${newLine}${valueIndent}${values}${newLine}${currentIndent}]` :
-        `${keyString}[]`;
+      return true;
     }
 
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          return keyString + '"__cycle__"';
+          result += keyString + '"__cycle__"';
+          return true;
         } else {
           throw new Error('Cycle reference during stringify object');
         }
@@ -113,23 +127,41 @@ const stringify = (initialValue, options) => {
         keys = keys.sort(comparator);
       }
 
-      const values = keys
-        .map(valueKey => Object.hasOwnProperty.call(value, valueKey) ?
-          builder(valueKey, value[valueKey], valueIndent, true) : undefined)
-        .filter(el => el !== undefined)
-        .join(`,${newLine}${valueIndent}`);
+      result += keyString + '{';
+
+      let isFirst = true;
+      for (const valueKey of keys) {
+        if (Object.hasOwnProperty.call(value, valueKey)) {
+          if (builder(valueKey, value[valueKey], valueIndent, true, !isFirst)) {
+            if (isFirst) {
+              isFirst = false;
+            }
+          }
+        }
+      }
+
+      if (isFirst) {
+        result += '}';
+      } else {
+        result += `${newLine}${currentIndent}}`;
+      }
 
       seen.delete(value);
 
-      return values.length ?
-        `${keyString}{${newLine}${valueIndent}${values}${newLine}${currentIndent}}` :
-        `${keyString}{}`;
+      return true;
     }
 
-    return value === undefined ? undefined : keyString + `${value}`;
+    if (value === undefined) {
+      return false;
+    } else {
+      result += keyString + `${value}`;
+      return true;
+    }
   };
 
-  return builder(null, initialValue, '', false) || '';
+  builder(null, initialValue, '', false, false)
+
+  return result.slice(1);
 };
 
 module.exports = {
