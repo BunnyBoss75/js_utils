@@ -1,4 +1,5 @@
 const microUtils = require('./microUtils');
+const stringBuilder = require('./experimental/stringBuilder');
 
 const defaultReplacer = (key, value) => {
   if (typeof key !== 'string' && key !== null) {
@@ -70,7 +71,7 @@ const stringify = (initialValue, options) => {
 
   const seen = new Set();
 
-  let result = '';
+  let result = new stringBuilder();
 
   const builder = (k, v, currentIndent, addKey, comma) => {
     const {key, value} = replacer(k, v);
@@ -81,7 +82,7 @@ const stringify = (initialValue, options) => {
     if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          result += keyString + '"__cycle__"';
+          result.add(keyString + '"__cycle__"');
           return true;
         } else {
           throw new Error('Cycle reference during stringify object');
@@ -89,7 +90,7 @@ const stringify = (initialValue, options) => {
       }
       seen.add(value);
 
-      result += keyString + '[';
+      result.add(keyString + '[');
 
       let isFirst = true;
       for (const el of value) {
@@ -101,9 +102,9 @@ const stringify = (initialValue, options) => {
       }
 
       if (isFirst) {
-        result += ']';
+        result.add(']');
       } else {
-        result += `${newLine}${currentIndent}]`;
+        result.add(`${newLine}${currentIndent}]`);
       }
 
       seen.delete(value);
@@ -114,7 +115,7 @@ const stringify = (initialValue, options) => {
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          result += keyString + '"__cycle__"';
+          result.add(keyString + '"__cycle__"');
           return true;
         } else {
           throw new Error('Cycle reference during stringify object');
@@ -127,7 +128,7 @@ const stringify = (initialValue, options) => {
         keys = keys.sort(comparator);
       }
 
-      result += keyString + '{';
+      result.add(keyString + '{');
 
       let isFirst = true;
       for (const valueKey of keys) {
@@ -141,9 +142,9 @@ const stringify = (initialValue, options) => {
       }
 
       if (isFirst) {
-        result += '}';
+        result.add('}');
       } else {
-        result += `${newLine}${currentIndent}}`;
+        result.add(`${newLine}${currentIndent}}`);
       }
 
       seen.delete(value);
@@ -154,14 +155,14 @@ const stringify = (initialValue, options) => {
     if (value === undefined) {
       return false;
     } else {
-      result += keyString + `${value}`;
+      result.add(keyString + `${value}`);
       return true;
     }
   };
 
   builder(null, initialValue, '', false, false)
 
-  return result.slice(1);
+  return result.toString().slice(1);
 };
 
 module.exports = {
