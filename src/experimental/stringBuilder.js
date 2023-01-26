@@ -8,30 +8,30 @@ class StringBuilder {
     this.buffersTail = this.buffersHead;
     this.length = 0;
     this.currentBufferLength = 0;
+    this.freeSize = this.bufferSize;
   }
 
   add(string) {
-    const buffered = Buffer.from(string);
-    const length = buffered.length;
-    const freeSize = this.bufferSize - this.currentBufferLength;
-    if (freeSize - length > -1) {
-      buffered.copy(this.currentBuffer, this.currentBufferLength);
+    const length = Buffer.byteLength(string);
+    if (this.freeSize - length > -1) {
+      this.currentBuffer.write(string, this.currentBufferLength);
       this.length += length;
       this.currentBufferLength += length;
+      this.freeSize -= length;
     } else {
-      const last = length - freeSize;
-      buffered.copy(this.currentBuffer, this.currentBufferLength, 0, freeSize);
-      this._push();
-      if (last > this.bufferSize) {
-        const newBuffer = Buffer.allocUnsafe(last);
-        buffered.copy(newBuffer, freeSize);
+      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
+      if (length > this.bufferSize) {
+        const newBuffer = Buffer.allocUnsafe(length);
+        newBuffer.write(string);
         this._push(newBuffer);
         this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
         this.currentBufferLength = 0;
+        this.freeSize = this.bufferSize;
       } else {
         this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
-        buffered.copy(this.currentBuffer, 0, freeSize);
-        this.currentBufferLength = last;
+        this.currentBuffer.write(string);
+        this.currentBufferLength = length;
+        this.freeSize = this.bufferSize - length;
       }
       this.length += length;
     }
