@@ -27,7 +27,7 @@ const defaultReplacer = (key, value) => {
       value = undefined;
       break;
     case 'number':
-      value = isFinite(value) ? value.toString() : undefined;
+      value = isFinite(value) ? value.toString() : 'null';
       break;
     case 'boolean':
       value = String(value);
