@@ -4,7 +4,7 @@ class StringBuilder {
     this.bufferSize = options.bufferSize || Buffer.poolSize;
 
     this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
-    this.buffersHead = [null, Buffer.allocUnsafe(0)];
+    this.buffersHead = {n: null, b: null};
     this.buffersTail = this.buffersHead;
     this.length = 0;
     this.currentBufferLength = 0;
@@ -13,9 +13,9 @@ class StringBuilder {
 
   add(string) {
     const length = Buffer.byteLength(string);
+
     if (this.freeSize - length > -1) {
       this.currentBuffer.write(string, this.currentBufferLength);
-      this.length += length;
       this.currentBufferLength += length;
       this.freeSize -= length;
     } else {
@@ -33,13 +33,15 @@ class StringBuilder {
         this.currentBufferLength = length;
         this.freeSize = this.bufferSize - length;
       }
-      this.length += length;
     }
+
+    this.length += length;
   }
 
   _push(buffer = this.currentBuffer) {
-    this.buffersTail[0] = [null, buffer];
-    this.buffersTail = this.buffersTail[0];
+    this.buffersTail.b = buffer;
+    this.buffersTail.n = {n: null, b: null};
+    this.buffersTail = this.buffersTail.n;
   }
 
   toString() {
@@ -47,12 +49,13 @@ class StringBuilder {
     const result = Buffer.allocUnsafe(this.length);
 
     let targetStart = 0;
-    do {
-      current[1].copy(result, targetStart);
-      targetStart += current[1].length;
-    } while (current = current[0]);
+    while (current.n) {
+      current.b.copy(result, targetStart);
+      targetStart += current.b.length;
+      current = current.n;
+    }
 
-    this.currentBuffer.subarray(0, this.currentBufferLength).copy(result, targetStart);
+    this.currentBuffer.copy(result, targetStart, 0, this.currentBufferLength)
     return result.toString();
   }
 }
