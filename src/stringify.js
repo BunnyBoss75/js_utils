@@ -1,53 +1,33 @@
 const microUtils = require('./microUtils');
-const stringBuilder = require('./experimental/stringBuilder');
+const StringBuilder = require('./experimental/stringBuilder');
 
-const defaultReplacer = (key, value) => {
-  if (typeof key !== 'string' && key !== null) {
-    if (key.toString) {
-      key = key.toString();
-    } else {
-      key = String(key);
-    }
+const codeString = (string) => {
+  const arr = [];
+  for (let i = 0; i < string.length; ++i) {
+    arr.push(string.charCodeAt(i))
   }
-
-  if (value && typeof value.toJSON === 'function') {
-    value = value.toJSON();
-  }
-
-  switch (typeof value) {
-    case 'string':
-      // TODO: escape sequence
-      value = `"${value}"`;
-      break;
-    case 'symbol':
-    case 'bigint':
-      value = value.toString();
-      break;
-    case 'function':
-    case 'undefined':
-      value = undefined;
-      break;
-    case 'number':
-      value = isFinite(value) ? value.toString() : undefined;
-      break;
-    case 'boolean':
-      value = String(value);
-      break;
-    case 'object':
-      if (value === null) {
-        value = 'null';
-      } else if (value instanceof RegExp) {
-        value = `"RegExp(${value.toString()})"`;
-      }
-
-      break;
-  }
-
-  return {key, value};
+  return arr;
 };
 
+const doubleQuoteCode = '"'.charCodeAt(0);
+const commaCode = ','.charCodeAt(0);
+const newLineCode = '\n'.charCodeAt(0);
+const spaceCode = ' '.charCodeAt(0);
+const colonCode = ':'.charCodeAt(0);
+const leftSquareBracket = '['.charCodeAt(0);
+const rightSquareBracket = ']'.charCodeAt(0);
+const leftCurlyBracket = '{'.charCodeAt(0);
+const rightCurlyBracket = '}'.charCodeAt(0);
+
+const cycleCodes = codeString('"__cycle__"');
+const trueCodes = codeString('true');
+const falseCodes = codeString('false');
+const nullCodes = codeString('null');
+const regExpPrefixCodes = codeString('"RegExp(');
+const regExpSuffixCodes = codeString(')"');
+
 const defaultOptions = {
-  replacer: defaultReplacer,
+  replacer: null,
   comparator: microUtils.defaultStringSymbolCompare,
   newLine: false,
   indent: 0,
@@ -62,27 +42,64 @@ const stringify = (initialValue, options) => {
     ...options,
   };
 
-  const newLine = options.newLine ? '\n' : '';
-  const indent = ' '.repeat(options.indent);
-  const keyValueIndent = ' '.repeat(options.keyValueIndent);
-  const {replacer, ignoreCycles, ignoreSymbols, comparator} = options;
+  const {
+    replacer,
+    ignoreCycles,
+    ignoreSymbols,
+    comparator,
+    newLine,
+    indent,
+    keyValueIndent,
+  } = options;
 
   const getKeys = ignoreSymbols ? Object.keys : Reflect.ownKeys;
 
   const seen = new Set();
 
-  let result = new stringBuilder();
+  let stringBuilder = new StringBuilder();
 
-  const builder = (k, v, currentIndent, addKey, comma) => {
-    const {key, value} = replacer(k, v);
+  const addKeyString = (comma, addKey, currentIndent, key) => {
+    if (comma) {
+      stringBuilder.addTwoBytes(commaCode);
+    }
+    if (newLine) {
+      stringBuilder.addTwoBytes(newLineCode);
+    }
+    stringBuilder.addTwoBytesWithFill(spaceCode, currentIndent);
+    if (addKey) {
+      stringBuilder.addTwoBytes(doubleQuoteCode);
 
+      if (typeof key === 'string') {
+        stringBuilder.addEscapedStringForJSON(key)
+      } else if (key.toString) {
+        stringBuilder.addEscapedStringForJSON(key.toString());
+      } else {
+        stringBuilder.addEscapedStringForJSON(String(key));
+      }
+
+      stringBuilder.addBytesArray([doubleQuoteCode, colonCode]);
+      stringBuilder.addTwoBytesWithFill(spaceCode, keyValueIndent);
+    }
+  }
+
+  const builder = (key, value, currentIndent, addKey, comma) => {
     const valueIndent = currentIndent + indent;
-    const keyString = (comma ? ',' : '') + newLine + currentIndent + (addKey ? `"${key}":${keyValueIndent}` : '');
+
+    if (replacer) {
+      const replacerResult = replacer(key, value);
+      key = replacerResult.key;
+      value = replacerResult.value;
+    }
+
+    if (value && typeof value.toJSON === 'function') {
+      value = value.toJSON();
+    }
 
     if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          result.add(keyString + '"__cycle__"');
+          addKeyString(comma, addKey, currentIndent, key);
+          stringBuilder.addBytesArray(cycleCodes);
           return true;
         } else {
           throw new Error('Cycle reference during stringify object');
@@ -90,7 +107,8 @@ const stringify = (initialValue, options) => {
       }
       seen.add(value);
 
-      result.add(keyString + '[');
+      addKeyString(comma, addKey, currentIndent, key);
+      stringBuilder.addTwoBytes(leftSquareBracket);
 
       let isFirst = true;
       for (const el of value) {
@@ -102,9 +120,13 @@ const stringify = (initialValue, options) => {
       }
 
       if (isFirst) {
-        result.add(']');
+        stringBuilder.addTwoBytes(rightSquareBracket);
       } else {
-        result.add(`${newLine}${currentIndent}]`);
+        if (newLine) {
+          stringBuilder.addTwoBytes(newLineCode);
+        }
+        stringBuilder.addTwoBytesWithFill(spaceCode, currentIndent);
+        stringBuilder.addTwoBytes(rightSquareBracket);
       }
 
       seen.delete(value);
@@ -115,7 +137,8 @@ const stringify = (initialValue, options) => {
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          result.add(keyString + '"__cycle__"');
+          addKeyString(comma, addKey, currentIndent, key);
+          stringBuilder.addBytesArray(cycleCodes);
           return true;
         } else {
           throw new Error('Cycle reference during stringify object');
@@ -128,7 +151,8 @@ const stringify = (initialValue, options) => {
         keys = keys.sort(comparator);
       }
 
-      result.add(keyString + '{');
+      addKeyString(comma, addKey, currentIndent, key);
+      stringBuilder.addTwoBytes(leftCurlyBracket);
 
       let isFirst = true;
       for (const valueKey of keys) {
@@ -142,9 +166,13 @@ const stringify = (initialValue, options) => {
       }
 
       if (isFirst) {
-        result.add('}');
+        stringBuilder.addTwoBytes(rightCurlyBracket);
       } else {
-        result.add(`${newLine}${currentIndent}}`);
+        if (newLine) {
+          stringBuilder.addTwoBytes(newLineCode);
+        }
+        stringBuilder.addTwoBytesWithFill(spaceCode, currentIndent);
+        stringBuilder.addTwoBytes(rightCurlyBracket);
       }
 
       seen.delete(value);
@@ -152,21 +180,63 @@ const stringify = (initialValue, options) => {
       return true;
     }
 
-    if (value === undefined) {
-      return false;
-    } else {
-      result.add(keyString + `${value}`);
-      return true;
+    switch (typeof value) {
+      case 'string':
+        addKeyString(comma, addKey, currentIndent, key);
+        stringBuilder.addTwoBytes(doubleQuoteCode);
+        stringBuilder.addEscapedStringForJSON(value);
+        stringBuilder.addTwoBytes(doubleQuoteCode);
+        return true;
+      case 'symbol':
+        addKeyString(comma, addKey, currentIndent, key);
+        stringBuilder.addTwoBytes(doubleQuoteCode);
+        stringBuilder.addEscapedStringForJSON(value.toString());
+        stringBuilder.addTwoBytes(doubleQuoteCode);
+        return true;
+      case 'bigint':
+        addKeyString(comma, addKey, currentIndent, key);
+        stringBuilder.addString(value.toString());
+        return true;
+      case 'function':
+      case 'undefined':
+        return false;
+      case 'number':
+        if (isFinite(value)) {
+          addKeyString(comma, addKey, currentIndent, key);
+          stringBuilder.addString(value.toString());
+          return true;
+        } else {
+          return false;
+        }
+      case 'boolean':
+        addKeyString(comma, addKey, currentIndent, key);
+        if (value) {
+          stringBuilder.addBytesArray(trueCodes);
+        } else {
+          stringBuilder.addBytesArray(falseCodes);
+        }
+        return true;
+      case 'object':
+        if (value instanceof RegExp) {
+          addKeyString(comma, addKey, currentIndent, key);
+          stringBuilder.addBytesArray(regExpPrefixCodes);
+          stringBuilder.addEscapedStringForJSON(value.toString());
+          stringBuilder.addBytesArray(regExpSuffixCodes);
+          return true;
+        }
+
+        addKeyString(comma, addKey, currentIndent, key);
+        stringBuilder.addBytesArray(nullCodes);
+        return true;
     }
   };
 
-  builder(null, initialValue, '', false, false)
+  builder(null, initialValue, 0, false, false)
 
-  return result.toString().slice(1);
+  return newLine ? stringBuilder.toString().slice(1) : stringBuilder.toString();
 };
 
 module.exports = {
   stringify,
   defaultOptions,
-  defaultReplacer,
 };

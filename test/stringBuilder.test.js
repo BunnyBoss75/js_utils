@@ -1,4 +1,4 @@
-const {describe, expect} = require('@jest/globals');
+const {describe, expect, test} = require('@jest/globals');
 
 const StringBuilder = require('../src/experimental/stringBuilder');
 
@@ -11,7 +11,7 @@ describe('stringBuilder', () => {
 
     let correctString = '';
     for (let i = 0; i < 100; ++i) {
-      stringBuilder.add(testArray[i % 100]);
+      stringBuilder.addString(testArray[i % 100]);
       correctString += testArray[i % 100];
     }
 
@@ -25,5 +25,20 @@ describe('stringBuilder', () => {
     const resultedString = stringBuilder.toString();
 
     expect(resultedString).toBe(correctString);
-  })
+  });
+
+  test('unicodeEscape', () => {
+    const stringBuilder = new StringBuilder(25);
+
+    stringBuilder.addUnicodeEscapeTwoBytes(0x1234);
+    stringBuilder.addUnicodeEscapeTwoBytes(0x5678);
+    stringBuilder.addUnicodeEscapeTwoBytes(0x9abc);
+    stringBuilder.addUnicodeEscapeTwoBytes(0xdef0);
+    stringBuilder.addUnicodeEscapeTwoBytes(0x0000);
+    stringBuilder.addUnicodeEscapeTwoBytes(0xffff);
+
+    const resultString = stringBuilder.toString();
+
+    expect(resultString).toBe('\\u1234\\u5678\\u9abc\\udef0\\u0000\\uffff');
+  });
 });
