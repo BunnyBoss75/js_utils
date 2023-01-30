@@ -7,7 +7,7 @@ const defaultLruOptions = {
 
 class LRU {
   // TODO: create with entries
-  // TODO: refactor and use default props
+  // TODO: add keys/values/entries and iterators for them
   constructor(options) {
     options = {
       ...defaultLruOptions,
@@ -42,19 +42,54 @@ class LRU {
     return value;
   }
 
+  /**
+   * @param entries - array with arrays with two items: key, value
+   * @param ttl
+   */
+  setMany(entries, ttl) {
+    return entries.map(([key, value]) => this.set(key, value, ttl));
+  }
+
   get(key) {
     const data = this._getData(key);
     return data ? data.v : undefined;
   }
 
+  getMany(keys) {
+    return keys.map(key => this.get(key));
+  }
+
   // TODO: in safeCache check resolver is function and other parameters check
-  async fetch(key, resolver, ttl) {
+  async resolve(key, resolver, ttl) {
     const data = this._getData(key);
     if (data) return data.v;
 
-    const newValue = await resolver();
+    const newValue = await resolver([key]);
     this._setNew(key, newValue, ttl);
     return newValue;
+  }
+
+  async resolveMany(keys, resolver, ttl) {
+    const datas = keys.map(key => this.cache.get(key));
+
+    const keysToFetch = [];
+    for (let i = 0; i < keys.length; ++i) {
+      if (!datas[i]) {
+        keysToFetch.push(keys[i]);
+      }
+    }
+
+    const newValues = await resolver(keysToFetch);
+
+    let newValueItter = 0;
+    return datas.map((data, index) => {
+      if (data) {
+        return data.v;
+      } else {
+        this._setNew(keys[index], newValues[newValueItter], ttl);
+        return newValues[newValueItter++];
+      }
+    });
   }
 
   // TODO: add deleteByValue ?
@@ -64,6 +99,10 @@ class LRU {
 
     this._deleteByData(data);
     return data.v;
+  }
+
+  deleteMany(keys) {
+    return keys.map(key => this.delete(key));
   }
 
   // TODO: add hasValue
