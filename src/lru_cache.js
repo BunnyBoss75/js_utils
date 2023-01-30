@@ -33,7 +33,12 @@ class LRU {
 
   // TODO: add "many" versions of function
   set(key, value, ttl) {
-    this._setNew(key, value, ttl);
+    if (this.cache.has(key)) {
+      this._update(key, value, ttl);
+    } else {
+      this._setNew(key, value, ttl);
+    }
+
     return value;
   }
 
@@ -67,7 +72,7 @@ class LRU {
   }
 
   _setNew(key, value, ttl) {
-    if (!this.cache.get(key) && this.keySize >= this.keyLimit) {
+    if (!this.cache.has(key) && this.keySize >= this.keyLimit) {
       this._deleteOldest();
     }
 
@@ -97,6 +102,14 @@ class LRU {
 
     this.cache.set(key, data);
     ++this.keySize;
+  }
+
+  _update(key, newValue, newTtl) {
+    const data = this.cache.get(key);
+    this._makeNew(data);
+
+    data.v = newValue;
+    data.t = this.getDate() + (newTtl || this.ttl);
   }
 
   _getData(key) {
