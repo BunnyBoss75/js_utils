@@ -151,7 +151,7 @@ class StringBuilder {
           // The current character is a leading surrogate.
           if (i + 1 < string.length) {
             // There is a next character.
-            const next = string[i + 1];
+            const next = string.charCodeAt(i + 1);
             if (0xdc00 <= next && next <= 0xdfff) {
               // The next character is a trailing surrogate, meaning this is a
               // surrogate pair.
