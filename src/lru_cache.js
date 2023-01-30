@@ -1,23 +1,69 @@
-class Cache {
-  constructor(options) {
-    // TODO
-    options = options || {};
+const defaultLruOptions = {
+  keyLimit: 100,
+  ttl: 60 * 1000,
+  getDate: Date.now,
+}
 
-    this.keyLimit = options.keyLimit || 100;
-    this.ttl = options.ttl || 60 * 1000;
-    this.getDate = options.getDate || Date.now.bind(Date);
+class LRU {
+  // TODO: create with entries
+  // TODO: refactor and use default props
+  constructor(options) {
+    // TODO: copy all from first
+    options = {
+      ...defaultLruOptions,
+      ...options,
+    };
+
+    this.keyLimit = options.keyLimit;
+    this.ttl = options.ttl;
+    this.getDate = options.getDate;
 
     this.new = this.old = null;
     this.keySize = 0;
     this.cache = new Map();
   }
 
+  // TODO: add "many" versions of function
   set(key, value, ttl) {
+    this._setNew(key, value, ttl);
+    return value;
+  }
+
+  get(key) {
+    const data = this._getData(key);
+    return data ? data.v : undefined;
+  }
+
+  // TODO: in safeCache check resolver is function and other parameters check
+  async fetch(key, resolver, ttl) {
+    const data = this._getData(key);
+    if (data) return data.v;
+
+    const newValue = await resolver();
+    this._setNew(key, newValue, ttl);
+    return newValue;
+  }
+
+  // TODO: add deleteByValue ?
+  delete(key) {
+    const data = this.cache.get(key);
+    if (!data) return undefined;
+
+    this._deleteByData(data);
+    return data.v;
+  }
+
+  // TODO: add hasValue
+  has(key) {
+    return !!this._getData(key);
+  }
+
+  _setNew(key, value, ttl) {
     if (!this.cache.get(key) && this.keySize >= this.keyLimit) {
       this._deleteOldest();
     }
 
-    const newTtl = this.getDate() + ttl || this.ttl;
+    const newTtl = this.getDate() + (ttl || this.ttl);
 
     let data;
     if (this.keySize) {
@@ -30,7 +76,7 @@ class Cache {
       };
       this.new.n = data;
       this.new = data;
-    } else {
+    } else { // first element in the list
       data = {
         k: key,
         v: value,
@@ -43,19 +89,6 @@ class Cache {
 
     this.cache.set(key, data);
     ++this.keySize;
-    return value;
-  }
-
-  delete(key) {
-    const data = this.cache.get(key);
-    if (!data) return undefined;
-
-    this.cache.delete(key);
-    return this._deleteData(data);
-  }
-
-  has(key) {
-    return !!this._getData(key);
   }
 
   _getData(key) {
@@ -63,15 +96,18 @@ class Cache {
     if (!data) return undefined;
 
     if (data.t < this.getDate()) {
-      this.cache.delete(key);
-      this._deleteData(data);
+      this._deleteByData(data);
       return undefined;
     }
+
+    this._makeNew(data);
 
     return data;
   }
 
-  _deleteData(data) {
+  _deleteByData(data) {
+    this.cache.delete(data.k);
+
     if (this.keySize === 1) {
       this.new = this.old = null;
     } else if (this.new === data) {
@@ -90,14 +126,14 @@ class Cache {
   }
 
   _makeNew(data) {
-    if (data === this.new) {
+    if (data === this.new) { // if single value - always yes
       return;
     }
 
-    if (this.keySize !== 2) {
+    if (this.keySize > 2) {
       if (data === this.old) {
         this.old = data.n;
-        data.n.o = null;
+        this.old.o = null;
       } else {
         data.n.o = data.o;
         data.o.n = data.n;
@@ -107,7 +143,7 @@ class Cache {
       data.o = this.new;
       this.new = data;
       data.n = null;
-    } else {
+    } else { // there are two values
       this.old.o = this.new;
       this.old.n = null;
       this.new.o = null;
@@ -135,7 +171,7 @@ class Cache {
   }
 }
 
-class SafeCache extends Cache {
+class SafeLRU extends LRU {
   constructor(options) {
     super(options);
   }
@@ -149,6 +185,6 @@ class SafeCache extends Cache {
 }
 
 module.exports = {
-  Cache,
-  SafeCache,
+  LRU,
+  SafeLRU,
 }
