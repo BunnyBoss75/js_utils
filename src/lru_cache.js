@@ -2,13 +2,13 @@ const defaultLruOptions = {
   keyLimit: 100,
   ttl: 60 * 1000,
   getDate: Date.now,
+  removeExpiredCoolDown: null,
 }
 
 class LRU {
   // TODO: create with entries
   // TODO: refactor and use default props
   constructor(options) {
-    // TODO: copy all from first
     options = {
       ...defaultLruOptions,
       ...options,
@@ -21,6 +21,14 @@ class LRU {
     this.new = this.old = null;
     this.keySize = 0;
     this.cache = new Map();
+
+    this.removeExpiredCoolDown = options.removeExpiredCoolDown;
+    if (this.removeExpiredCoolDown) {
+      this.intervalId = setInterval(this._removeExpired, this.removeExpiredCoolDown);
+      if (this.intervalId && typeof this.intervalId.unref === 'function') {
+        this.intervalId.unref(); // interval doesn't prevent stopping process
+      }
+    }
   }
 
   // TODO: add "many" versions of function
@@ -168,6 +176,19 @@ class LRU {
 
     this.cache.delete(key);
     --this.keySize;
+  }
+
+  _removeExpired() {
+    const currentTime = this.getDate();
+
+    let current = this.new;
+    while(current) {
+      const next = current.n;
+      if (current.t < currentTime) {
+        this._deleteByData(current);
+      }
+      current = next;
+    }
   }
 }
 
