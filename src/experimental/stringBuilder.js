@@ -49,6 +49,18 @@ class StringBuilder {
    * @param string - string
    */
   addString(string) {
+    if (string.length > 32) {
+      this.addStringBig(string);
+    } else {
+      this.addStringSmall(string);
+    }
+  }
+
+  /**
+   * Big string is where length more than 32
+   * @param string - string
+   */
+  addStringBig(string) {
     const byteLength = string.length * 2;
 
     if (this.currentBuffer.length - this.currentBufferLength - byteLength > -1) {
@@ -59,6 +71,34 @@ class StringBuilder {
       this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize > byteLength ? this.bufferSize : byteLength);
       this.currentBuffer.write(string, 'utf16le');
       this.currentBufferLength = byteLength;
+    }
+
+    this.length += byteLength;
+  }
+
+  /**
+   * Small string is where length up to 32
+   * @param string - string
+   */
+  addStringSmall(string) {
+    const length = string.length;
+    const byteLength = length * 2;
+
+    if (this.currentBuffer.length - this.currentBufferLength - byteLength > -1) {
+      for (let i = 0; i < length; ++i) {
+        const char = string.charCodeAt(i);
+        this.currentBuffer[this.currentBufferLength++] = char % 256;
+        this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+      }
+    } else {
+      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
+      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize > byteLength ? this.bufferSize : byteLength);
+      this.currentBufferLength = 0;
+      for (let i = 0; i < length; ++i) {
+        const char = string.charCodeAt(i);
+        this.currentBuffer[this.currentBufferLength++] = char % 256;
+        this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+      }
     }
 
     this.length += byteLength;
@@ -135,14 +175,13 @@ class StringBuilder {
    * Based on the algorithm from original v8 JsonStringifier::SerializeString_
    * (8eed79319a1c386bb11a770c71e7745827c2dbac)
    * @param string
-   * @returns {string}
    */
   addEscapedStringForJSON(string) {
     const length = string.length;
     for (let i = 0; i < length; ++i) {
       const char = string.charCodeAt(i);
       if (jsonEscapeMapping[char]) {
-        this.addString(jsonEscapeMapping[char]);
+        this.addStringSmall(jsonEscapeMapping[char]);
       } else if (char < 0x20) {
         this.addUnicodeEscapeTwoBytes(char);
       } else if (0xd800 <= char && char <= 0xdfff) {
