@@ -1,4 +1,4 @@
-const defaultStringSymbolCompare = (a, b) => String.prototype.localeCompare.call(a.toString(), b.toString());
+const defaultStringSymbolCompare = (a, b) => a.toString().localeCompare(b.toString());
 
 module.exports = {
   defaultStringSymbolCompare,

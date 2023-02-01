@@ -24,7 +24,6 @@ const jsonEscapeMapping = {
   0x0d: '\\r',
   0x22: '\\\"',
   0x5c: '\\\\',
-  0x7f: '\x7f',
 };
 
 const slashCode = '\\'.charCodeAt(0);
@@ -36,10 +35,10 @@ class StringBuilder {
       this.bufferSize = options;
     } else {
       options = options || {};
-      this.bufferSize = options.bufferSize || Buffer.poolSize;
+      this.bufferSize = options.bufferSize || 1024 * 8;
     }
 
-    this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
+    this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize);
     this.buffersHead = {n: null, b: null};
     this.buffersTail = this.buffersHead;
     this.length = 0;
@@ -57,7 +56,7 @@ class StringBuilder {
       this.currentBufferLength += byteLength;
     } else {
       this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafe(this.bufferSize > byteLength ? this.bufferSize : byteLength);
+      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize > byteLength ? this.bufferSize : byteLength);
       this.currentBuffer.write(string, 'utf16le');
       this.currentBufferLength = byteLength;
     }
@@ -71,12 +70,12 @@ class StringBuilder {
   addTwoBytes(char) {
     if (this.currentBuffer.length - this.currentBufferLength - 2 > 1) {
       this.currentBuffer[this.currentBufferLength++] = char % 256;
-      this.currentBuffer[this.currentBufferLength++] = char >> 8;
+      this.currentBuffer[this.currentBufferLength++] = char >>> 8;
     } else {
       this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
+      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize);
       this.currentBuffer[0] = char % 256;
-      this.currentBuffer[1] = char >> 8;
+      this.currentBuffer[1] = char >>> 8;
       this.currentBufferLength = 2;
     }
 
@@ -88,13 +87,13 @@ class StringBuilder {
 
     if (this.currentBuffer.length - this.currentBufferLength - byteLength < 0) {
       this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafe(byteLength > this.bufferSize ? byteLength : this.bufferSize);
+      this.currentBuffer = Buffer.allocUnsafeSlow(byteLength > this.bufferSize ? byteLength : this.bufferSize);
       this.currentBufferLength = 0;
     }
 
     for (let i = 0; i < count; ++i) {
       this.currentBuffer[this.currentBufferLength++] = char % 256;
-      this.currentBuffer[this.currentBufferLength++] = char >> 8;
+      this.currentBuffer[this.currentBufferLength++] = char >>> 8;
     }
 
     this.length += byteLength;
@@ -107,7 +106,7 @@ class StringBuilder {
   addUnicodeEscapeTwoBytes(char) {
     if (this.currentBuffer.length - this.currentBufferLength - 12 < 0) {
       this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafe(12 > this.bufferSize ? 12 : this.bufferSize);
+      this.currentBuffer = Buffer.allocUnsafeSlow(12 > this.bufferSize ? 12 : this.bufferSize);
       this.currentBufferLength = 0;
     }
 
@@ -117,13 +116,13 @@ class StringBuilder {
     this.currentBuffer[this.currentBufferLength++] = uCode;
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char >> 12];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char >>> 12];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >> 8) % 16];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >>> 8) % 16];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >> 4) % 16];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >>> 4) % 16];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
     this.currentBuffer[this.currentBufferLength++] = charHexMapping[char % 16];
@@ -139,7 +138,8 @@ class StringBuilder {
    * @returns {string}
    */
   addEscapedStringForJSON(string) {
-    for (let i = 0; i < string.length; ++i) {
+    const length = string.length;
+    for (let i = 0; i < length; ++i) {
       const char = string.charCodeAt(i);
       if (jsonEscapeMapping[char]) {
         this.addString(jsonEscapeMapping[char]);
@@ -149,7 +149,7 @@ class StringBuilder {
         // The current character is a surrogate.
         if (char <= 0xdbff) {
           // The current character is a leading surrogate.
-          if (i + 1 < string.length) {
+          if (i + 1 < length) {
             // There is a next character.
             const next = string.charCodeAt(i + 1);
             if (0xdc00 <= next && next <= 0xdfff) {
@@ -187,13 +187,13 @@ class StringBuilder {
     const byteLength = array.length * 2;
     if (this.currentBuffer.length - this.currentBufferLength - byteLength < 0) {
       this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafe(byteLength > this.bufferSize ? byteLength : this.bufferSize);
+      this.currentBuffer = Buffer.allocUnsafeSlow(byteLength > this.bufferSize ? byteLength : this.bufferSize);
       this.currentBufferLength = 0;
     }
 
     for (let byte of array) {
       this.currentBuffer[this.currentBufferLength++] = byte % 256;
-      this.currentBuffer[this.currentBufferLength++] = byte >> 8;
+      this.currentBuffer[this.currentBufferLength++] = byte >>> 8;
     }
 
     this.length += byteLength;
@@ -207,7 +207,7 @@ class StringBuilder {
 
   toString() {
     let current = this.buffersHead;
-    const result = Buffer.allocUnsafe(this.length);
+    const result = Buffer.allocUnsafeSlow(this.length);
 
     let targetStart = 0;
     while (current.n) {

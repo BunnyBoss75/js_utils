@@ -58,7 +58,7 @@ const stringify = (initialValue, options) => {
 
   let stringBuilder = new StringBuilder();
 
-  const addKeyString = (comma, addKey, currentIndent, key) => {
+  const addKeyString = (comma, currentIndent, key) => {
     if (comma) {
       stringBuilder.addTwoBytes(commaCode);
     }
@@ -66,7 +66,7 @@ const stringify = (initialValue, options) => {
       stringBuilder.addTwoBytes(newLineCode);
     }
     stringBuilder.addTwoBytesWithFill(spaceCode, currentIndent);
-    if (addKey) {
+    if (key !== null) {
       stringBuilder.addTwoBytes(doubleQuoteCode);
 
       if (typeof key === 'string') {
@@ -82,7 +82,7 @@ const stringify = (initialValue, options) => {
     }
   }
 
-  const builder = (key, value, currentIndent, addKey, comma) => {
+  const builder = (key, value, currentIndent, comma) => {
     const valueIndent = currentIndent + indent;
 
     if (replacer) {
@@ -98,7 +98,7 @@ const stringify = (initialValue, options) => {
     if (Array.isArray(value)) {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          addKeyString(comma, addKey, currentIndent, key);
+          addKeyString(comma, currentIndent, key);
           stringBuilder.addBytesArray(cycleCodes);
           return true;
         } else {
@@ -107,12 +107,12 @@ const stringify = (initialValue, options) => {
       }
       seen.add(value);
 
-      addKeyString(comma, addKey, currentIndent, key);
+      addKeyString(comma, currentIndent, key);
       stringBuilder.addTwoBytes(leftSquareBracket);
 
       let isFirst = true;
       for (const el of value) {
-        if (builder(null, el, valueIndent, false, !isFirst)) {
+        if (builder(null, el, valueIndent, !isFirst)) {
           if (isFirst) {
             isFirst = false;
           }
@@ -137,7 +137,7 @@ const stringify = (initialValue, options) => {
     if (value && typeof value === 'object') {
       if (seen.has(value)) {
         if (ignoreCycles) {
-          addKeyString(comma, addKey, currentIndent, key);
+          addKeyString(comma, currentIndent, key);
           stringBuilder.addBytesArray(cycleCodes);
           return true;
         } else {
@@ -151,16 +151,14 @@ const stringify = (initialValue, options) => {
         keys = keys.sort(comparator);
       }
 
-      addKeyString(comma, addKey, currentIndent, key);
+      addKeyString(comma, currentIndent, key);
       stringBuilder.addTwoBytes(leftCurlyBracket);
 
       let isFirst = true;
       for (const valueKey of keys) {
-        if (Object.hasOwnProperty.call(value, valueKey)) {
-          if (builder(valueKey, value[valueKey], valueIndent, true, !isFirst)) {
-            if (isFirst) {
-              isFirst = false;
-            }
+        if (builder(valueKey, value[valueKey], valueIndent, !isFirst)) {
+          if (isFirst) {
+            isFirst = false;
           }
         }
       }
@@ -182,34 +180,43 @@ const stringify = (initialValue, options) => {
 
     switch (typeof value) {
       case 'string':
-        addKeyString(comma, addKey, currentIndent, key);
+        addKeyString(comma, currentIndent, key);
         stringBuilder.addTwoBytes(doubleQuoteCode);
         stringBuilder.addEscapedStringForJSON(value);
         stringBuilder.addTwoBytes(doubleQuoteCode);
         return true;
       case 'symbol':
-        addKeyString(comma, addKey, currentIndent, key);
+        addKeyString(comma, currentIndent, key);
         stringBuilder.addTwoBytes(doubleQuoteCode);
         stringBuilder.addEscapedStringForJSON(value.toString());
         stringBuilder.addTwoBytes(doubleQuoteCode);
         return true;
       case 'bigint':
-        addKeyString(comma, addKey, currentIndent, key);
+        addKeyString(comma, currentIndent, key);
         stringBuilder.addString(value.toString());
         return true;
       case 'function':
       case 'undefined':
+        if (key === null) {
+          addKeyString(comma, currentIndent, key);
+          stringBuilder.addBytesArray(nullCodes);
+          return true;
+        }
         return false;
       case 'number':
         if (isFinite(value)) {
-          addKeyString(comma, addKey, currentIndent, key);
+          addKeyString(comma, currentIndent, key);
           stringBuilder.addString(value.toString());
+          return true;
+        } else if (key === null) {
+          addKeyString(comma, currentIndent, key);
+          stringBuilder.addBytesArray(nullCodes);
           return true;
         } else {
           return false;
         }
       case 'boolean':
-        addKeyString(comma, addKey, currentIndent, key);
+        addKeyString(comma, currentIndent, key);
         if (value) {
           stringBuilder.addBytesArray(trueCodes);
         } else {
@@ -218,20 +225,20 @@ const stringify = (initialValue, options) => {
         return true;
       case 'object':
         if (value instanceof RegExp) {
-          addKeyString(comma, addKey, currentIndent, key);
+          addKeyString(comma, currentIndent, key);
           stringBuilder.addBytesArray(regExpPrefixCodes);
           stringBuilder.addEscapedStringForJSON(value.toString());
           stringBuilder.addBytesArray(regExpSuffixCodes);
           return true;
         }
 
-        addKeyString(comma, addKey, currentIndent, key);
+        addKeyString(comma, currentIndent, key);
         stringBuilder.addBytesArray(nullCodes);
         return true;
     }
   };
 
-  builder(null, initialValue, 0, false, false)
+  builder(null, initialValue, 0, false)
 
   return newLine ? stringBuilder.toString().slice(1) : stringBuilder.toString();
 };
