@@ -25,10 +25,12 @@ const jsonEscapeMapping = {
   0x22: '\\\"',
   0x5c: '\\\\',
 };
+const jsonEscapeRegExp = /[\u0000-\u001f\u0022\u005c]|(?<![\ud800-\udbff])[\udc00-\udfff]|[\ud800-\udbff](?![\udc00-\udfff])/;
 
 const slashCode = '\\'.charCodeAt(0);
 const uCode = 'u'.charCodeAt(0);
 
+// TODO: in case if size more than bufferLength and create new buffer - try to use Buffer.from()
 class StringBuilder {
   constructor(options) {
     if (typeof options === 'number') {

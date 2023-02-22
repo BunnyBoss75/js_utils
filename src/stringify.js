@@ -1,6 +1,9 @@
 const microUtils = require('./microUtils');
 const StringBuilder = require('./experimental/stringBuilder');
 
+// TODO: use benchmark, compare to other libs, validate options, create stringify by call with options
+// TODO: add option validation
+
 const codeString = (string) => {
   const arr = [];
   for (let i = 0; i < string.length; ++i) {
@@ -58,6 +61,7 @@ const stringify = (initialValue, options) => {
 
   const getKeys = ignoreSymbols ? Object.keys : Reflect.ownKeys;
 
+  // TODO: property of not object/array values?
   const seen = new Set();
 
   let stringBuilder = new StringBuilder();
@@ -242,7 +246,7 @@ const stringify = (initialValue, options) => {
     }
   };
 
-  builder(null, initialValue, 0, false)
+  builder(null, initialValue, 0, false);
 
   return newLine ? stringBuilder.toString().slice(1) : stringBuilder.toString();
 };
