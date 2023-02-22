@@ -142,7 +142,19 @@ const stringify = (initialValue, options) => {
       return true;
     }
 
-    if (value && typeof value === 'object') {
+    if (typeof value === 'object') {
+      if (value instanceof RegExp) {
+        addKeyString(comma, currentIndent, key);
+        stringBuilder.addBytesArray(regExpPrefixCodes);
+        stringBuilder.addEscapedStringForJSON(value.toString());
+        stringBuilder.addBytesArray(regExpSuffixCodes);
+        return true;
+      } else if (value === null) {
+        addKeyString(comma, currentIndent, key);
+        stringBuilder.addBytesArray(nullCodes);
+        return true;
+      }
+
       if (seen.has(value)) {
         if (ignoreCycles) {
           addKeyString(comma, currentIndent, key);
@@ -230,18 +242,6 @@ const stringify = (initialValue, options) => {
         } else {
           stringBuilder.addBytesArray(falseCodes);
         }
-        return true;
-      case 'object':
-        if (value instanceof RegExp) {
-          addKeyString(comma, currentIndent, key);
-          stringBuilder.addBytesArray(regExpPrefixCodes);
-          stringBuilder.addEscapedStringForJSON(value.toString());
-          stringBuilder.addBytesArray(regExpSuffixCodes);
-          return true;
-        }
-
-        addKeyString(comma, currentIndent, key);
-        stringBuilder.addBytesArray(nullCodes);
         return true;
     }
   };
