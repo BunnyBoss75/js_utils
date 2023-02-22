@@ -251,7 +251,6 @@ const stringify = (initialValue, options) => {
   return newLine ? stringBuilder.toString().slice(1) : stringBuilder.toString();
 };
 
-module.exports = {
-  stringify,
-  defaultOptions,
-};
+stringify.defaultOptions = defaultOptions;
+
+module.exports = stringify;
