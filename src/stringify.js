@@ -28,7 +28,7 @@ const regExpSuffixCodes = codeString(')"');
 
 const defaultOptions = {
   replacer: null,
-  comparator: microUtils.defaultStringSymbolCompare,
+  comparator: true,
   newLine: false,
   indent: 0,
   keyValueIndent: 0,
@@ -42,7 +42,7 @@ const stringify = (initialValue, options) => {
     ...options,
   };
 
-  const {
+  let {
     replacer,
     ignoreCycles,
     ignoreSymbols,
@@ -51,6 +51,10 @@ const stringify = (initialValue, options) => {
     indent,
     keyValueIndent,
   } = options;
+
+  if (comparator === true) {
+    comparator = ignoreSymbols ? microUtils.defaultStringCompare : microUtils.defaultStringSymbolCompare;
+  }
 
   const getKeys = ignoreSymbols ? Object.keys : Reflect.ownKeys;
 
