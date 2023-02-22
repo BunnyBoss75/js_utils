@@ -248,6 +248,12 @@ class StringBuilder {
 
   toString() {
     let current = this.buffersHead;
+
+    // there is only one buffer
+    if (!current.n) {
+      return this.currentBuffer.subarray(0, this.currentBufferLength).toString('utf16le');
+    }
+
     const result = Buffer.allocUnsafeSlow(this.length);
 
     let targetStart = 0;
