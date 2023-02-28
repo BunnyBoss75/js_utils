@@ -1,4 +1,4 @@
-# JS Utils
+# Bunny Utils
 
 This repository was created to write various interesting functions/classes to improve my hard skills.
 So far, this will be a collection of little-related things. To write them, I use different ideas

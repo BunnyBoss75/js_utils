@@ -35,7 +35,7 @@ const defaultOptions = {
   newLine: false,
   indent: 0,
   keyValueIndent: 0,
-  ignoreCycles: false,
+  ignoreCycles: true,
   ignoreSymbols: false,
 }
 

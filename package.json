@@ -1,18 +1,19 @@
 {
-  "name": "js_utils",
-  "version": "0.0.1",
-  "description": "",
+  "name": "bunny-utils",
+  "version": "0.1.0",
   "main": "./index.js",
-  "types": "./index.d.ts",
+  "types": "./types/index.d.ts",
+  "files": [
+    "./src/**",
+    "./types/**"
+  ],
   "engines": {
-    "node": "16.x"
+    "node": ">=16.0.0"
   },
   "scripts": {
     "eslint": "eslint --cache ./src/**.js",
     "test": "jest"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "devDependencies": {
     "@jest/globals": "^29.4.1",

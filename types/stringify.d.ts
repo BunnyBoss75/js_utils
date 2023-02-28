@@ -19,7 +19,7 @@ interface defaultOptions extends options {
   newLine: false,
   indent: 0,
   keyValueIndent: 0,
-  ignoreCycles: false,
+  ignoreCycles: true,
   ignoreSymbols: false,
 }
 export declare function stringify (value: any, options?: options): string;
