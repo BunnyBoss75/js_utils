@@ -59,6 +59,10 @@ const stringify = (initialValue, options) => {
     comparator = ignoreSymbols ? microUtils.defaultStringCompare : microUtils.defaultStringSymbolCompare;
   }
 
+  if (typeof replacer !== 'function') {
+    replacer = null;
+  }
+
   const getKeys = ignoreSymbols ? Object.keys : Reflect.ownKeys;
 
   // TODO: property of not object/array values?
@@ -93,9 +97,11 @@ const stringify = (initialValue, options) => {
   const builder = (key, value, currentIndent, comma) => {
     const valueIndent = currentIndent + indent;
 
-    if (replacer) {
+    if (replacer !== null) {
       const replacerResult = replacer(key, value);
-      key = replacerResult.key;
+      if (key !== null) {
+        key = replacerResult.key;
+      }
       value = replacerResult.value;
     }
 
