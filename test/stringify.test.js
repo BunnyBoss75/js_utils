@@ -1,6 +1,6 @@
 const {describe, expect, test} = require('@jest/globals');
 
-const stringify = require('../src/stringify').stringify;
+const stringify = require('../src/stringify');
 
 describe('stringify', () => {
   test('baseTest', () => {
@@ -61,6 +61,7 @@ describe('stringify', () => {
     "c": 3,
     "d": [
       true,
+      null,
       null
     ]
   },
