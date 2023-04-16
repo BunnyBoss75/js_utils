@@ -1,3 +1,5 @@
+const microUtils = require('../microUtils');
+
 const charHexMapping = {
   0x0: 0x30,
   0x1: 0x31,
@@ -30,20 +32,22 @@ const jsonEscapeRegExp = /[\u0000-\u001f\u0022\u005c]|(?<![\ud800-\udbff])[\udc0
 const slashCode = '\\'.charCodeAt(0);
 const uCode = 'u'.charCodeAt(0);
 
+// TODO: see og_protocol
+// TODO: use return this
 // TODO: in case if size more than bufferLength and create new buffer - try to use Buffer.from()
-class StringBuilder {
+class BufferStringBuilder {
   constructor(options) {
     if (typeof options === 'number') {
       this.bufferSize = options;
     } else {
       options = options || {};
-      this.bufferSize = options.bufferSize || 1024 * 8;
+      this.bufferSize = options.bufferSize || 128;
     }
 
-    this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize);
-    this.buffersHead = {n: null, b: null};
-    this.buffersTail = this.buffersHead;
-    this.length = 0;
+    this.bufferSize = (Math.ceil(this.bufferSize) | 0x1) + 1;
+
+    this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
+    this.buffers = [];
     this.currentBufferLength = 0;
   }
 
@@ -69,13 +73,10 @@ class StringBuilder {
       this.currentBuffer.write(string, this.currentBufferLength, 'utf16le');
       this.currentBufferLength += byteLength;
     } else {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize > byteLength ? this.bufferSize : byteLength);
+      this._expandWithLength(byteLength);
       this.currentBuffer.write(string, 'utf16le');
       this.currentBufferLength = byteLength;
     }
-
-    this.length += byteLength;
   }
 
   /**
@@ -89,21 +90,18 @@ class StringBuilder {
     if (this.currentBuffer.length - this.currentBufferLength - byteLength > -1) {
       for (let i = 0; i < length; ++i) {
         const char = string.charCodeAt(i);
-        this.currentBuffer[this.currentBufferLength++] = char % 256;
-        this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+        this.currentBuffer[this.currentBufferLength++] = char & 0xff;
+        this.currentBuffer[this.currentBufferLength++] = char >> 8;
       }
     } else {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize > byteLength ? this.bufferSize : byteLength);
+      this._expandWithLength(byteLength);
       this.currentBufferLength = 0;
       for (let i = 0; i < length; ++i) {
         const char = string.charCodeAt(i);
-        this.currentBuffer[this.currentBufferLength++] = char % 256;
-        this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+        this.currentBuffer[this.currentBufferLength++] = char & 0xff;
+        this.currentBuffer[this.currentBufferLength++] = char >> 8;
       }
     }
-
-    this.length += byteLength;
   }
 
   /**
@@ -111,34 +109,28 @@ class StringBuilder {
    */
   addTwoBytes(char) {
     if (this.currentBuffer.length - this.currentBufferLength - 2 > 1) {
-      this.currentBuffer[this.currentBufferLength++] = char % 256;
-      this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+      this.currentBuffer[this.currentBufferLength++] = char & 0xff;
+      this.currentBuffer[this.currentBufferLength++] = char >> 8;
     } else {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(this.bufferSize);
-      this.currentBuffer[0] = char % 256;
-      this.currentBuffer[1] = char >>> 8;
+      this._expand();
+      this.currentBuffer[0] = char & 0xff;
+      this.currentBuffer[1] = char >> 8;
       this.currentBufferLength = 2;
     }
-
-    this.length += 2;
   }
 
   addTwoBytesWithFill(char, count) {
     const byteLength = count * 2;
 
     if (this.currentBuffer.length - this.currentBufferLength - byteLength < 0) {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(byteLength > this.bufferSize ? byteLength : this.bufferSize);
+      this._expandWithLength(byteLength);
       this.currentBufferLength = 0;
     }
 
     for (let i = 0; i < count; ++i) {
-      this.currentBuffer[this.currentBufferLength++] = char % 256;
-      this.currentBuffer[this.currentBufferLength++] = char >>> 8;
+      this.currentBuffer[this.currentBufferLength++] = char & 0xff;
+      this.currentBuffer[this.currentBufferLength++] = char >> 8;
     }
-
-    this.length += byteLength;
   }
 
   /**
@@ -147,8 +139,7 @@ class StringBuilder {
    */
   addUnicodeEscapeTwoBytes(char) {
     if (this.currentBuffer.length - this.currentBufferLength - 12 < 0) {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(12 > this.bufferSize ? 12 : this.bufferSize);
+      this._expandWithLength(12);
       this.currentBufferLength = 0;
     }
 
@@ -158,19 +149,17 @@ class StringBuilder {
     this.currentBuffer[this.currentBufferLength++] = uCode;
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char >>> 12];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char >> 12];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >>> 8) % 16];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >> 8) & 0xf];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >>> 4) % 16];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[(char >> 4) & 0xf];
     this.currentBuffer[this.currentBufferLength++] = 0;
 
-    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char % 16];
+    this.currentBuffer[this.currentBufferLength++] = charHexMapping[char & 0xf];
     this.currentBuffer[this.currentBufferLength++] = 0;
-
-    this.length += 12;
   }
 
   /**
@@ -227,45 +216,36 @@ class StringBuilder {
   addBytesArray(array) {
     const byteLength = array.length * 2;
     if (this.currentBuffer.length - this.currentBufferLength - byteLength < 0) {
-      this._push(this.currentBuffer.subarray(0, this.currentBufferLength));
-      this.currentBuffer = Buffer.allocUnsafeSlow(byteLength > this.bufferSize ? byteLength : this.bufferSize);
+      this._expandWithLength(byteLength);
       this.currentBufferLength = 0;
     }
 
     for (let byte of array) {
-      this.currentBuffer[this.currentBufferLength++] = byte % 256;
-      this.currentBuffer[this.currentBufferLength++] = byte >>> 8;
+      this.currentBuffer[this.currentBufferLength++] = byte & 0xff;
+      this.currentBuffer[this.currentBufferLength++] = byte >> 8;
     }
-
-    this.length += byteLength;
   }
 
-  _push(buffer = this.currentBuffer) {
-    this.buffersTail.b = buffer;
-    this.buffersTail.n = {n: null, b: null};
-    this.buffersTail = this.buffersTail.n;
+  _expand() {
+    this.buffers.push(this.currentBuffer.subarray(0, this.currentBufferLength));
+    this.bufferSize = (Math.floor(microUtils.phi * this.bufferSize) | 0x1) + 1;
+    this.currentBuffer = Buffer.allocUnsafe(this.bufferSize);
+  }
+
+  _expandWithLength(length) {
+    this.buffers.push(this.currentBuffer.subarray(0, this.currentBufferLength));
+    this.bufferSize = (Math.floor(microUtils.phi * this.bufferSize) | 0x1) + 1;
+    this.currentBuffer = Buffer.allocUnsafe(this.bufferSize > length ? this.bufferSize : length);
   }
 
   toString() {
-    let current = this.buffersHead;
-
-    // there is only one buffer
-    if (!current.n) {
+    if (this.buffers.length === 0) {
       return this.currentBuffer.subarray(0, this.currentBufferLength).toString('utf16le');
     }
 
-    const result = Buffer.allocUnsafeSlow(this.length);
-
-    let targetStart = 0;
-    while (current.n) {
-      current.b.copy(result, targetStart);
-      targetStart += current.b.length;
-      current = current.n;
-    }
-
-    this.currentBuffer.copy(result, targetStart, 0, this.currentBufferLength)
-    return result.toString('utf16le');
+    const buffers = [...this.buffers, this.currentBuffer.subarray(0, this.currentBufferLength)];
+    return Buffer.concat(buffers).toString('utf16le');
   }
 }
 
-module.exports = StringBuilder;
+module.exports = BufferStringBuilder;
