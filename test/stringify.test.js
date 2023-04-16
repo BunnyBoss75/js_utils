@@ -1,6 +1,7 @@
 const {describe, expect, test} = require('@jest/globals');
 
 const stringify = require('../src/stringify');
+const stringifyV2 = require('../src/stringify/stringifyV2');
 
 describe('stringify', () => {
   test('baseTest', () => {
@@ -41,8 +42,9 @@ describe('stringify', () => {
     };
 
     const res = stringify(toStringify, options);
+    const resV2 = stringifyV2.createStringify(options)(toStringify);
 
-    expect(res).toBe(`{
+    const expected = `{
   "a": 123,
   "a1": {
     "a": 2,
@@ -85,6 +87,9 @@ describe('stringify', () => {
       ]
     }
   }
-}`);
+}`;
+
+    expect(res).toBe(expected);
+    expect(resV2).toBe(expected);
   });
 });

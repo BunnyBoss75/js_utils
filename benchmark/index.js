@@ -2,7 +2,10 @@ const stringifyBenchmark = require('./stringify');
 const stringBuilderBenchmark = require('./stringBuilder');
 
 const jsUtilsStringify = require('../src/stringify');
+const jsUtilsStringifyV2 = require('../src/stringify/stringifyV2');
+const jsUtilsStringifyV2NotStable = jsUtilsStringifyV2.createStringify({comparator: false});
 const safeStableStringify = require('safe-stable-stringify');
+const safeStableStringifyMotStable = safeStableStringify.configure({deterministic: false});
 const jsonify = require('jsonify');
 const jsonStableStringify = require('json-stable-stringify')
 
@@ -10,8 +13,12 @@ const bufferStringBuilder = require('../src/experimental/bufferStringBuilder');
 const commonStringBuilder = require('../src/experimental/commonStringBuilder');
 
 stringifyBenchmark('js_utils.stringify:default', value => jsUtilsStringify(value));
-stringifyBenchmark('JSON.stringify:default', value => JSON.stringify(value))
+stringifyBenchmark('js_utils.stringify:notStable', value => jsUtilsStringify(value, {comparator: false}));
+stringifyBenchmark('js_utils.stringifyV2:default', value => jsUtilsStringifyV2(value));
+stringifyBenchmark('js_utils.stringifyV2:notStable', value => jsUtilsStringifyV2NotStable(value));
+stringifyBenchmark('JSON.stringify:default', value => JSON.stringify(value));
 stringifyBenchmark('safeStableStringify:default', value => safeStableStringify(value));
+stringifyBenchmark('safeStableStringify:notStable', value => safeStableStringifyMotStable(value));
 stringifyBenchmark('jsonify:default', value => jsonify.stringify(value));
 stringifyBenchmark('jsonStableStringify:default', value => jsonStableStringify(value));
 
