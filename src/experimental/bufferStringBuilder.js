@@ -1,4 +1,5 @@
 const microUtils = require('../microUtils');
+const AbstractStringBuilder = require('./abstractStringBuilder');
 
 const charHexMapping = {
   0x0: 0x30,
@@ -35,8 +36,9 @@ const uCode = 'u'.charCodeAt(0);
 // TODO: see og_protocol
 // TODO: use return this
 // TODO: in case if size more than bufferLength and create new buffer - try to use Buffer.from()
-class BufferStringBuilder {
+class BufferStringBuilder extends AbstractStringBuilder {
   constructor(options) {
+    super();
     if (typeof options === 'number') {
       this.bufferSize = options;
     } else {

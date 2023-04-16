@@ -1,5 +1,6 @@
 const microUtils = require('./microUtils');
-const StringBuilder = require('./experimental/stringBuilder');
+const StringBuilder = require('./experimental/bufferStringBuilder');
+const CommonStringBuilder = require('./experimental/commonStringBuilder');
 
 // TODO: use benchmark, compare to other libs, validate options, create stringify by call with options
 // TODO: add option validation
@@ -68,7 +69,7 @@ const stringify = (initialValue, options) => {
   // TODO: property of not object/array values?
   const seen = new Set();
 
-  let stringBuilder = new StringBuilder();
+  let stringBuilder = new CommonStringBuilder();
 
   const addKeyString = (comma, currentIndent, key) => {
     if (comma) {
