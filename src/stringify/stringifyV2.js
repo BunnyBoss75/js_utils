@@ -1,62 +1,9 @@
 const microUtils = require('../microUtils');
 
-const jsonEscapeMapping = {
-  0x08: '\\b',
-  0x09: '\\t',
-  0x0a: '\\n',
-  0x0c: '\\f',
-  0x0d: '\\r',
-  0x22: '\\\"',
-  0x5c: '\\\\',
-};
-const escapeString = (string) => {
-  let result = '';
-  const length = string.length;
-  for (let i = 0; i < length; ++i) {
-    const char = string.charCodeAt(i);
-    if (jsonEscapeMapping[char]) {
-      result += jsonEscapeMapping[char];
-    } else if (char < 0x20) {
-      const number = char.toString(16);
-      result += `\\u${'0'.repeat(4 - number.length)}${number}`;
-    } else if (0xd800 <= char && char <= 0xdfff) {
-      // The current character is a surrogate.
-      if (char <= 0xdbff) {
-        // The current character is a leading surrogate.
-        if (i + 1 < length) {
-          // There is a next character.
-          const next = string.charCodeAt(i + 1);
-          if (0xdc00 <= next && next <= 0xdfff) {
-            // The next character is a trailing surrogate, meaning this is a
-            // surrogate pair.
-            result += String.fromCharCode(char) + String.fromCharCode(next);
-            ++i;
-          } else {
-            // The next character is not a trailing surrogate. Thus, the
-            // current character is a lone leading surrogate.
-            const number = char.toString(16);
-            result += `\\u${'0'.repeat(4 - number.length)}${number}`;
-          }
-        } else {
-          // There is no next character. Thus, the current character is a lone
-          // leading surrogate.
-          const number = char.toString(16);
-          result += `\\u${'0'.repeat(4 - number.length)}${number}`;
-        }
-      } else {
-        // The current character is a lone trailing surrogate. (If it had been
-        // preceded by a leading surrogate, we would've ended up in the other
-        // branch earlier on, and the current character would've been handled
-        // as part of the surrogate pair already.)
-        const number = char.toString(16);
-        result += `\\u${'0'.repeat(4 - number.length)}${number}`;
-      }
-    } else {
-      result += String.fromCharCode(char);
-    }
-  }
-  return result;
-};
+// using idea from safe-stable-stringify
+// if regexp.test() = false - we can use string as is without escaping
+const possiblyNeedEscape = /[\u0000-\u001f\u0022\u005c\ud800-\udfff]/;
+const testEscapingMagicNumber = 5000;
 const cycleString = '__cycle__';
 
 const defaultOptions = {
@@ -68,6 +15,10 @@ const defaultOptions = {
   ignoreCycles: true,
   ignoreSymbols: false,
 };
+
+// TODO: don't pass value by value
+// TODO: remove getKeys if ignoreSymbols and no sort
+// TODO: use buildForArray buildForObject instead of build
 
 const getValidOptions = (options) => {
   options = {
@@ -128,6 +79,27 @@ const createBuildCode = (options) => {
     paramList.push('indent');
   }
 
+  const constructEscapeCode = (valueName, resultReceiver, precalculate = false) => {
+    if (!precalculate) {
+      return `
+  // idea and magic number from safe-stable-stringify
+  if (${valueName}.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(${valueName})) {
+    ${resultReceiver} \`"\${${valueName}}"\`;
+  } else {
+    ${resultReceiver} JSON.stringify(${valueName});
+  }`;
+    } else {
+      return `
+  // idea and magic number from safe-stable-stringify
+  const constructEscapeValue = ${valueName};
+  if (constructEscapeValue.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(constructEscapeValue)) {
+    ${resultReceiver} \`"\${constructEscapeValue}"\`;
+  } else {
+    ${resultReceiver} JSON.stringify(constructEscapeValue);
+  }`;
+    }
+  };
+
   const addKeyCode = `
     if (comma === true) {
       context.str += ',';
@@ -138,10 +110,15 @@ ${
     context.str += ' '.repeat(indent);\`` : options.newLine ? `
     context.str += '\\n';` : ''}
     if (key !== null) {
-      context.str += \`"\${options.escapeString(
-        typeof key === 'string' ?
+      const keyStr = typeof key === 'string' ?
         key : typeof key.toString === 'function' ?
-        key.toString() : String(key))}":${' '.repeat(options.keyValueIndent)}\`;
+        key.toString() : String(key);
+      // idea and magic number from safe-stable-stringify
+      if (keyStr.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(keyStr)) {
+        context.str += \`"\${keyStr}":${' '.repeat(options.keyValueIndent)}\`;
+      } else {
+        context.str += \`\${JSON.stringify(keyStr)}:${' '.repeat(options.keyValueIndent)}\`;
+      }
     }
   `;
 
@@ -219,7 +196,8 @@ ${!options.newLine && !options.indent ? '      context.str += \']\';' : `
     if (typeof value === 'object') {
       if (value instanceof RegExp) {
 ${addKeyCode}
-        context.str += \`"RegExp(\${options.escapeString(value.toString())})"\`;
+        // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
+        context.str += JSON.stringify(\`RegExp(\${value.toString()})\`);
         return true;
       } else if (value === null) {
 ${addKeyCode}
@@ -261,11 +239,11 @@ ${!options.newLine && !options.indent ? '      context.str += \'}\';' : `
     switch (typeof value) {
       case 'string':
 ${addKeyCode}
-        context.str += \`"\${options.escapeString(value)}"\`;
+${constructEscapeCode('value', 'context.str +=')}
         return true;
       case 'symbol':
 ${addKeyCode}
-        context.str += \`"\${options.escapeString(value.toString())}"\`;
+${constructEscapeCode('value.toString()', 'context.str +=', true)}
         return true;
       case 'bigint':
 ${addKeyCode}
@@ -339,7 +317,8 @@ ${options.newLine ? `
     
     if (typeof value === 'object') {
       if (value instanceof RegExp) {
-        context.str = \`"RegExp(\${options.escapeString(value.toString())})"\`;
+        // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
+        context.str = JSON.stringify(\`RegExp(\${value.toString()})\`);
         return true;
       } else if (value === null) {
         context.str = 'null';
@@ -373,9 +352,9 @@ ${options.newLine ? `
     
     switch (typeof value) {
       case 'string':
-        context.str = \`"\${options.escapeString(value)}"\`;
+${constructEscapeCode('value', 'context.str =')}
       case 'symbol':
-        context.str = \`"\${options.escapeString(value.toString())}"\`;
+${constructEscapeCode('value.toString()', 'context.str =', true)}
       case 'bigint':
         context.str = value.toString();
       case 'number':
@@ -404,7 +383,7 @@ const createStringify = (options) => {
 
   const [startBuild, build] = createBuildCode(options);
 
-  options.escapeString = escapeString;
+  options.possiblyNeedEscape = possiblyNeedEscape;
   options.startBuild = startBuild;
   options.build = build;
 
