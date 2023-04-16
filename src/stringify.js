@@ -4,6 +4,7 @@ const CommonStringBuilder = require('./experimental/commonStringBuilder');
 
 // TODO: use benchmark, compare to other libs, validate options, create stringify by call with options
 // TODO: add option validation
+// TODO: use compile for remove unused code if configure()
 
 const codeString = (string) => {
   const arr = [];
@@ -58,6 +59,8 @@ const stringify = (initialValue, options) => {
 
   if (comparator === true) {
     comparator = ignoreSymbols ? microUtils.defaultStringCompare : microUtils.defaultStringSymbolCompare;
+  } else if (typeof comparator !== 'function') {
+    comparator = null;
   }
 
   if (typeof replacer !== 'function') {
@@ -174,7 +177,7 @@ const stringify = (initialValue, options) => {
       seen.add(value);
 
       let keys = getKeys(value);
-      if (comparator) {
+      if (comparator !== null) {
         keys = keys.sort(comparator);
       }
 

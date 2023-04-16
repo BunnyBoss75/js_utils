@@ -8,6 +8,12 @@ circular.circular = data;
 const circularArray = Array(10).fill(1).map(() => circular);
 circularArray.push(circularArray);
 circularArray[0].circularArray = circularArray;
+const deep = {...data};
+let currentDeep = deep;
+for (let i = 0; i < 20; ++i) {
+  currentDeep.deep = {...data};
+  currentDeep = currentDeep.deep;
+}
 
 module.exports = (name, stringify) => {
   const suite = new Benchmark.Suite(name);
@@ -19,7 +25,7 @@ module.exports = (name, stringify) => {
       stringify({a:1});
     })
     .add(`${name}: simple array    `, () => {
-      stringify([{a:1}, {b:2}]);
+      stringify([{a:1}, {b:3, a:2}]);
     })
     .add(`${name}: package.json    `, () => {
       stringify(data);
@@ -32,6 +38,9 @@ module.exports = (name, stringify) => {
     })
     .add(`${name}: circularArray   `, () => {
       stringify(circular);
+    })
+    .add(`${name}: deep            `, () => {
+      stringify(deep);
     })
     .on('cycle', event => {
       console.log(String(event.target));
