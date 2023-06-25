@@ -188,68 +188,71 @@ ${options.replacer === null ? '' : !isArray ? `
     value = options.replacer(null, value).value;
 `}
     
-    if (value && typeof value.toJSON === 'function') {
-      value = value.toJSON();
-    }
-
-    if (Array.isArray(value)) {
-${addSeenCode(isArray, isStart)}
-${addKeyCode(isArray, isStart)}
-
-      context.str += '[';
-
-      let isFirst = true;
-      for (const el of value) {
-        if (options.buildArrayElement(context, options, el${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})) {
-          if (isFirst === true) {
-            isFirst = false;
-          }
-        }
-      }
-
-      ${addCloseBracketsCode(isStart, true)}
-
-      context.seen.delete(value);
-
-      return${isStart ? '' : ' true'};
-    }
-    
-    if (typeof value === 'object') {
-      if (value instanceof RegExp) {
-${addKeyCode(isArray, isStart)}
-        // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
-        context.str += JSON.stringify(\`RegExp(\${value.toString()})\`);
-        return${isStart ? '' : ' true'};
-      } else if (value === null) {
-${addKeyCode(isArray, isStart)}
-        context.str += 'null';
-        return${isStart ? '' : ' true'};
-      }
-
-${addSeenCode(isArray, isStart)}
-
-      let keys = ${options.ignoreSymbols ? 'Object.keys' : 'Reflect.ownKeys'}(value);
-${options.comparator !== null ? '      keys = keys.sort(options.comparator);' : ''}
-${addKeyCode(isArray, isStart)}
-      context.str += '{';
-
-      let isFirst = true;
-      for (const valueKey of keys) {
-        if (options.buildObjectElement(context, options, value[valueKey], valueKey${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})) {
-          if (isFirst === true) {
-            isFirst = false;
-          }
-        }
-      }
-
-      ${addCloseBracketsCode(isStart, false)}
-      
-      context.seen.delete(value);
-
-      return${isStart ? '' : ' true'};
-    }
-    
     switch (typeof value) {
+      case 'object':
+        if (value === null) {
+          ${addKeyCode(isArray, isStart)}
+          context.str += 'null';
+          return${isStart ? '' : ' true'};
+        } else if (value instanceof RegExp) {
+          ${addKeyCode(isArray, isStart)}
+          // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
+          context.str += JSON.stringify(\`RegExp(\${value.toString()})\`);
+          return${isStart ? '' : ' true'};
+        }
+        if (typeof value.toJSON === 'function') {
+          value = value.toJSON(${!isArray ? 'key' : ''});
+          if (typeof value !== 'object') {
+            return ${isStart ?
+    'options.startBuild(context, options, value)' : isArray ?
+      `options.buildArrayElement(context, options, value${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})` :
+      `options.buildObjectElement(context, options, value, key${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})`};
+          }
+        }
+
+        if (Array.isArray(value)) {
+${addSeenCode(isArray, isStart)}
+${addKeyCode(isArray, isStart)}
+
+          context.str += '[';
+
+          let isFirst = true;
+          for (const el of value) {
+            if (options.buildArrayElement(context, options, el${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''}) === true) {
+              if (isFirst === true) {
+                isFirst = false;
+              }
+            }
+          }
+
+          ${addCloseBracketsCode(isStart, true)}
+    
+          context.seen.delete(value);
+    
+          return${isStart ? '' : ' true'};
+        } else {
+          ${addSeenCode(isArray, isStart)}
+
+          let keys = ${options.ignoreSymbols ? 'Object.keys' : 'Reflect.ownKeys'}(value);
+    ${options.comparator !== null ? '      keys = keys.sort(options.comparator);' : ''}
+    ${addKeyCode(isArray, isStart)}
+          context.str += '{';
+
+          let isFirst = true;
+          for (const valueKey of keys) {
+            if (options.buildObjectElement(context, options, value[valueKey], valueKey${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''}) === true) {
+              if (isFirst === true) {
+                isFirst = false;
+              }
+            }
+          }
+    
+          ${addCloseBracketsCode(isStart, false)}
+          
+          context.seen.delete(value);
+    
+          return${isStart ? '' : ' true'};
+        }
       case 'string':
 ${addKeyCode(isArray, isStart)}
 ${addEscapeCode('value', 'context.str +=')}
