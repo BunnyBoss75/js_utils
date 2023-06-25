@@ -73,325 +73,262 @@ const getValidOptions = (options) => {
 };
 
 const createBuildCode = (options) => {
-  const paramListStart = ['context', 'options', 'seen', 'value'];
-  const paramList = [...paramListStart, 'key', 'comma'];
+  const paramListStart = ['context', 'options', 'value'];
+  const paramObjectList = [...paramListStart, 'key', 'comma'];
+  const paramArrayList = [...paramListStart, 'comma'];
   if (options.indent) {
-    paramList.push('indent');
+    paramObjectList.push('indent');
+    paramArrayList.push('indent');
   }
 
-  const constructEscapeCode = (valueName, resultReceiver, precalculate = false) => {
+  const addEscapeCode = (valueName, resultReceiver, precalculate = false) => {
     if (!precalculate) {
       return `
-  // idea and magic number from safe-stable-stringify
-  if (${valueName}.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(${valueName})) {
-    ${resultReceiver} \`"\${${valueName}}"\`;
-  } else {
-    ${resultReceiver} JSON.stringify(${valueName});
-  }`;
+      // idea and magic number from safe-stable-stringify
+      if (${valueName}.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(${valueName})) {
+        ${resultReceiver} \`"\${${valueName}}"\`;
+      } else {
+        ${resultReceiver} JSON.stringify(${valueName});
+      }`;
     } else {
       return `
-  // idea and magic number from safe-stable-stringify
-  const constructEscapeValue = ${valueName};
-  if (constructEscapeValue.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(constructEscapeValue)) {
-    ${resultReceiver} \`"\${constructEscapeValue}"\`;
-  } else {
-    ${resultReceiver} JSON.stringify(constructEscapeValue);
-  }`;
+      // idea and magic number from safe-stable-stringify
+      const constructEscapeValue = ${valueName};
+      if (constructEscapeValue.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(constructEscapeValue)) {
+        ${resultReceiver} \`"\${constructEscapeValue}"\`;
+      } else {
+        ${resultReceiver} JSON.stringify(constructEscapeValue);
+      }`;
     }
   };
 
-  const addKeyCode = `
-    if (comma === true) {
-      context.str += ',';
+  const addCloseBracketsCode = (isStart, forArray) => {
+    const bracket = forArray ? ']' : '}';
+    if ((isStart || !options.indent) && !options.newLine) {
+      return `
+      context.str += '${bracket}';
+      `;
+    } else if ((isStart || !options.indent) && options.newLine) {
+      return `
+      context.str += isFirst === true ? '${bracket}' : '\\n${bracket}';
+      `;
+    } else if (options.newLine) {
+      return `
+      context.str += isFirst === true ? '${bracket}' : '\\n' + ' '.repeat(indent) + '${bracket}';
+      `;
+    } else { // !options.newLine
+      return `
+      context.str += isFirst === true ? '${bracket}' : ' '.repeat(indent) + '${bracket}';
+      `;
     }
-${
-  options.indent && options.newLine ? `
+  };
+
+  const addKeyCode = (isArray, isStart) => {
+    if (isStart) {
+      return  '';
+    }
+
+    const before = `
+      if (comma === true) {
+        context.str += ',';
+      }
+      
+      ${options.indent && options.newLine ? `
     context.str += '\\n' + ' '.repeat(indent);` : options.indent ? `
     context.str += ' '.repeat(indent);\`` : options.newLine ? `
     context.str += '\\n';` : ''}
-    if (key !== null) {
-      const keyStr = typeof key === 'string' ?
-        key : typeof key.toString === 'function' ?
-        key.toString() : String(key);
-      // idea and magic number from safe-stable-stringify
-      if (keyStr.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(keyStr)) {
-        context.str += \`"\${keyStr}":${' '.repeat(options.keyValueIndent)}\`;
-      } else {
-        context.str += \`\${JSON.stringify(keyStr)}:${' '.repeat(options.keyValueIndent)}\`;
-      }
-    }
-  `;
+    `;
 
-  const checkSeenCode = `
-      if (seen.has(value)) {
-${options.ignoreCycles ? `
-${addKeyCode}
+    if (isArray) {
+      return before;
+    } else {
+      return before + `
+        keyStr = typeof key === 'string' ?
+          key : typeof key.toString === 'function' ?
+          key.toString() : String(key);
+        // idea and magic number from safe-stable-stringify
+        if (keyStr.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(keyStr)) {
+          context.str += \`"\${keyStr}":${' '.repeat(options.keyValueIndent)}\`;
+        } else {
+          context.str += \`\${JSON.stringify(keyStr)}:${' '.repeat(options.keyValueIndent)}\`;
+        }
+      `;
+    }
+  }
+
+  const addSeenCode = (isArray, isStart) => {
+    if (isStart) {
+      return `
+      context.seen.add(value);
+      `;
+    } else {
+      return `
+      if (context.seen.has(value)) {
+${options.ignoreCycles ? `${addKeyCode(isArray, isStart)}
         context.str += '"${cycleString}"';
         return true;` : `
         throw new Error('Cycle reference during stringify object');`}
       }
-  `;
-
-  let buildCode = '';
-  let startBuildCode = '';
-
-  if (options.indent) {
-    buildCode += `
-    const valueIndent = indent + ${options.indent};
+      context.seen.add(value);
     `;
-  }
-
-  if (options.replacer !== null) {
-    const replacerPart = `
-    const replacerResult = options.replacer(key, value);
-    if (key !== null) {
-      key = replacerResult.key;
     }
-    value = replacerResult.value;
-    `;
-    buildCode += replacerPart;
-    startBuildCode += replacerPart;
+
   }
 
-  const toJsonPart = `
+  const buildCode = (isArray, isStart) => {
+    return `
+    ${!isArray ? 'let keyStr;' : ''}
+    ${!isStart && options.indent ? `
+        const valueIndent = indent + ${options.indent};
+    ` : ''}
+${options.replacer === null ? '' : !isArray ? `
+    const replacerResult = options.replacer(key, value);
+    key = replacerResult.key;
+    value = replacerResult.value;` : `
+    value = options.replacer(null, value).value;
+`}
+    
     if (value && typeof value.toJSON === 'function') {
       value = value.toJSON();
     }
-  `;
-  buildCode += toJsonPart;
-  startBuildCode += toJsonPart;
 
-  buildCode += `
     if (Array.isArray(value)) {
-${checkSeenCode}
-      seen.add(value);
-
-${addKeyCode}
+${addSeenCode(isArray, isStart)}
+${addKeyCode(isArray, isStart)}
 
       context.str += '[';
 
       let isFirst = true;
       for (const el of value) {
-        if (options.build(context, options, seen, el, null, !isFirst${options.indent ? ', valueIndent' : ''})) {
-          if (isFirst) {
+        if (options.buildArrayElement(context, options, el${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})) {
+          if (isFirst === true) {
             isFirst = false;
           }
         }
       }
 
-${!options.newLine && !options.indent ? '      context.str += \']\';' : `
-      if (isFirst) {
-        context.str += ']';
-      } else {
-        context.str += ${options.newLine && options.indent ?
-    '\'\\n\' + \' \'.repeat(indent) + \']\'' : options.newLine ?
-      '\'\\n]\'' : '\' \'.repeat(indent) + \']\''};
-      }`}
+      ${addCloseBracketsCode(isStart, true)}
 
-      seen.delete(value);
+      context.seen.delete(value);
 
-      return true;
+      return${isStart ? '' : ' true'};
     }
     
     if (typeof value === 'object') {
       if (value instanceof RegExp) {
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
         // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
         context.str += JSON.stringify(\`RegExp(\${value.toString()})\`);
-        return true;
+        return${isStart ? '' : ' true'};
       } else if (value === null) {
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
         context.str += 'null';
-        return true;
+        return${isStart ? '' : ' true'};
       }
 
-${checkSeenCode}
-      seen.add(value);
+${addSeenCode(isArray, isStart)}
 
       let keys = ${options.ignoreSymbols ? 'Object.keys' : 'Reflect.ownKeys'}(value);
 ${options.comparator !== null ? '      keys = keys.sort(options.comparator);' : ''}
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
       context.str += '{';
 
       let isFirst = true;
       for (const valueKey of keys) {
-        if (options.build(context, options, seen, value[valueKey], valueKey, !isFirst${options.indent ? ', valueIndent' : ''})) {
-          if (isFirst) {
+        if (options.buildObjectElement(context, options, value[valueKey], valueKey${isStart ? '' : ', !isFirst'}${options.indent ? ', valueIndent' : ''})) {
+          if (isFirst === true) {
             isFirst = false;
           }
         }
       }
 
-${!options.newLine && !options.indent ? '      context.str += \'}\';' : `
-      if (isFirst) {
-        context.str += '}';
-      } else {
-        context.str += ${options.newLine && options.indent ? 
-    '\'\\n\' + \' \'.repeat(indent) + \'}\'' : options.newLine ?
-      '\'\\n}\'' : '\' \'.repeat(indent) + \'}\''};
-      }`}
+      ${addCloseBracketsCode(isStart, false)}
       
-      seen.delete(value);
+      context.seen.delete(value);
 
-      return true;
+      return${isStart ? '' : ' true'};
     }
     
     switch (typeof value) {
       case 'string':
-${addKeyCode}
-${constructEscapeCode('value', 'context.str +=')}
-        return true;
+${addKeyCode(isArray, isStart)}
+${addEscapeCode('value', 'context.str +=')}
+        return${isStart ? '' : ' true'};
       case 'symbol':
-${addKeyCode}
-${constructEscapeCode('value.toString()', 'context.str +=', true)}
-        return true;
+${addKeyCode(isArray, isStart)}
+${addEscapeCode('value.toString()', 'context.str +=', true)}
+        return${isStart ? '' : ' true'};
       case 'bigint':
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
         context.str += value.toString();
-        return true;
+        return${isStart ? '' : ' true'};
       case 'function':
       case 'undefined':
-        if (key === null) {
-          if (comma === true) {
-            context.str += ',';
-          }
+${isStart || isArray ? `
+        ${!isStart ? `if (comma === true) {
+          context.str += ',';
+        }` : ''}
 ${options.indent && options.newLine ? `
-          context.str += '\\n' + ' '.repeat(indent) + 'null';` : options.indent ? `
-          context.str += ' '.repeat(indent) + 'null';\`` : options.newLine ? `
-          context.str += '\\nnull';` : '          context.str += \'null\''}
-          return true;
-        }
-        return false;
+        context.str += '\\n' + ' '.repeat(indent) + 'null';` : options.indent ? `
+        context.str += ' '.repeat(indent) + 'null';\`` : options.newLine ? `
+        context.str += '\\nnull';` : '          context.str += \'null\''}
+        return${isStart ? '' : ' true'};
+` : `
+        return${isStart ? '' : ' false'};`}
       case 'number':
         if (isFinite(value)) {
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
           context.str += value.toString();
-          return true;
-        } else if (key === null) {
-          if (comma === true) {
+          return${isStart ? '' : ' true'};
+        } else {
+          ${isStart || isArray ? `
+          ${!isStart ? `if (comma === true) {
             context.str += ',';
-          }
+          }` : ''}
 ${options.indent && options.newLine ? `
           context.str += '\\n' + ' '.repeat(indent) + 'null';` : options.indent ? `
           context.str += ' '.repeat(indent) + 'null';\`` : options.newLine ? `
           context.str += '\\nnull';` : '          context.str += \'null\''}
-          return true;
-        } else {
+          return${isStart ? '' : ' true'};
+` : `
           return false;
+`}
         }
       case 'boolean':
-${addKeyCode}
+${addKeyCode(isArray, isStart)}
         if (value === true) {
           context.str += 'true';
         } else {
           context.str += 'false';
         }
-        return true;
+        return${isStart ? '' : ' true'};
     }
   `;
-
-  startBuildCode += `
-    if (Array.isArray(value)) {
-      seen.add(value);
-
-      context.str = '[';
-
-      let isFirst = true;
-      for (const el of value) {
-        if (options.build(context, options, seen, el, null, !isFirst${options.indent ? `, ${options.indent}` : ''})) {
-          if (isFirst) {
-            isFirst = false;
-          }
-        }
-      }
-
-${options.newLine ? `
-      if (isFirst) {
-        context.str += ']';
-      } else {
-        context.str += '\\n]';
-      }
-` : '      context.str += \']\';'}
-      return;
-    }
-    
-    if (typeof value === 'object') {
-      if (value instanceof RegExp) {
-        // immediately use escaping from JSON.stringify as RegExp frequently contains special characters
-        context.str = JSON.stringify(\`RegExp(\${value.toString()})\`);
-        return true;
-      } else if (value === null) {
-        context.str = 'null';
-        return true;
-      }
-
-      seen.add(value);
-
-      let keys = ${options.ignoreSymbols ? 'Object.keys' : 'Reflect.ownKeys'}(value);
-${options.comparator !== null ? '      keys = keys.sort(options.comparator);' : ''}
-      context.str = '{';
-
-      let isFirst = true;
-      for (const valueKey of keys) {
-        if (options.build(context, options, seen, value[valueKey], valueKey, !isFirst${options.indent ? `, ${options.indent}` : ''})) {
-          if (isFirst) {
-            isFirst = false;
-          }
-        }
-      }
-
-${options.newLine ? `
-      if (isFirst) {
-        context.str += '}';
-      } else {
-        context.str += '\\n}';
-      }
-` : '      context.str += \'}\';'}
-      return;
-    }
-    
-    switch (typeof value) {
-      case 'string':
-${constructEscapeCode('value', 'context.str =')}
-      case 'symbol':
-${constructEscapeCode('value.toString()', 'context.str =', true)}
-      case 'bigint':
-        context.str = value.toString();
-      case 'number':
-        if (isFinite(value)) {
-          context.str = value.toString();
-        } else {
-          context.str = 'null';
-        }
-      case 'boolean':
-        if (value === true) {
-          context.str = 'true';
-        } else {
-          context.str = 'false';
-        }
-    }
-  `;
+  };
 
   return [
-    Function(...paramListStart, startBuildCode),
-    Function(...paramList, buildCode),
+    Function(...paramListStart, buildCode(true, true)),
+    Function(...paramArrayList, buildCode(true, false)),
+    Function(...paramObjectList, buildCode(false, false)),
   ];
 };
 
 const createStringify = (options) => {
   options = getValidOptions(options);
 
-  const [startBuild, build] = createBuildCode(options);
+  const [startBuild, buildArrayElement, buildObjectElement] = createBuildCode(options);
 
   options.possiblyNeedEscape = possiblyNeedEscape;
   options.startBuild = startBuild;
-  options.build = build;
+  options.buildArrayElement = buildArrayElement;
+  options.buildObjectElement = buildObjectElement;
 
   return value => {
     const context = {};
-    const seen = new Set();
+    context.seen = new Set();
+    context.str = '';
 
-    options.startBuild(context, options, seen, value);
+    options.startBuild(context, options, value);
 
     return context.str;
   };
