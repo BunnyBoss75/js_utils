@@ -142,10 +142,18 @@ const createBuildCode = (options) => {
     if (isArray) {
       return before;
     } else {
-      return before + `
-        keyStr = typeof key === 'string' ?
-          key : typeof key.toString === 'function' ?
-          key.toString() : String(key);
+      if (options.ignoreSymbols) {
+        return before + `
+        // idea and magic number from safe-stable-stringify
+        if (key.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(key)) {
+          context.str += \`"\${key}":${' '.repeat(options.keyValueIndent)}\`;
+        } else {
+          context.str += \`\${JSON.stringify(key)}:${' '.repeat(options.keyValueIndent)}\`;
+        }
+      `;
+      } else {
+        return before + `
+        keyStr = key.toString();
         // idea and magic number from safe-stable-stringify
         if (keyStr.length < ${testEscapingMagicNumber} && !options.possiblyNeedEscape.test(keyStr)) {
           context.str += \`"\${keyStr}":${' '.repeat(options.keyValueIndent)}\`;
@@ -153,6 +161,7 @@ const createBuildCode = (options) => {
           context.str += \`\${JSON.stringify(keyStr)}:${' '.repeat(options.keyValueIndent)}\`;
         }
       `;
+      }
     }
   }
 
@@ -177,7 +186,7 @@ ${options.ignoreCycles ? `${addKeyCode(isArray, isStart)}
 
   const buildCode = (isArray, isStart) => {
     return `
-    ${!isArray ? 'let keyStr;' : ''}
+    ${!isArray && !options.ignoreSymbols ? 'let keyStr;' : ''}
     ${!isStart && options.indent ? `
         const valueIndent = indent + ${options.indent};
     ` : ''}
