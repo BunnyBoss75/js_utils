@@ -4,7 +4,7 @@ type replacer = (key: objectKey, value: any) => ({key: objectKey, value: any});
 type comparator = (a: objectKey, b: objectKey) => number;
 
 interface options {
-  replacer?: replacer,
+  replacer?: replacer|null,
   comparator?: comparator|boolean,
   newLine?: boolean,
   indent?: number,
