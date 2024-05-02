@@ -43,10 +43,13 @@ const getValidOptions = (options) => {
     resultOptions.comparator = options.ignoreSymbols ?
       microUtils.defaultStringCompare :
       microUtils.defaultStringSymbolCompare;
+    resultOptions.isDefaultComparator = true;
   } else if (typeof options.comparator !== 'function') {
     resultOptions.comparator = null;
+    resultOptions.isDefaultComparator = null;
   } else {
     resultOptions.comparator = options.comparator;
+    resultOptions.isDefaultComparator = false;
   }
 
   if (!Number.isInteger(options.indent)) {
@@ -243,7 +246,23 @@ ${addKeyCode(isArray, isStart)}
           ${addSeenCode(isArray, isStart)}
 
           let keys = ${options.ignoreSymbols ? 'Object.keys' : 'Reflect.ownKeys'}(value);
-    ${options.comparator !== null ? '      keys = keys.sort(options.comparator);' : ''}
+    ${options.comparator === null ? '' : `
+          // idea of using insert sort taken from safe-stable-stringify
+          if (keys.length > 2e2) {
+            keys.sort(${options.isDefaultComparator === false ? 'options.comparator' : ''});
+          } else {
+            for (let i = 1; i < keys.length; i++) {
+              const currentValue = keys[i];
+              let position = i;
+              while (position !== 0 && options.comparator(keys[position - 1], currentValue) > 0) {
+                keys[position] = keys[position - 1];
+                position--;
+              }
+              keys[position] = currentValue;
+            }
+          }
+`
+}
     ${addKeyCode(isArray, isStart)}
           context.str += '{';
 
