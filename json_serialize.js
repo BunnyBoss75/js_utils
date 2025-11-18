@@ -10,7 +10,7 @@
  */
 
 /*
-number:
+primitive:
 00xxxxxx - variant number ref
 01xxxxxx - variant continue number ref
 100xxxxx - 13bit ZigZag
@@ -53,6 +53,7 @@ id,type,name,url,data,status,error,message,value,user,size,key,path,body,api_key
 // TODO: use brotli dictionary for string compression
 // TODO: use little-endian
 // TODO: 2nd version: use FSE, code additional bits with context
+// use dictionary for all (types dict (end) schemas (just ended), binary (number 0), binary (two-bites 0), string dict (empty string) strings)
 
 /*
 {a:{b:1,b1:2,b2:3},c:"2"}
