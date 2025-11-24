@@ -34,25 +34,21 @@ primitive tags:
  */
 
 /*
-(use 64 dict during lz77 ref)
 string tags:
 0 - null
 1-2 - ref 8,16 bit (16 bit starts from 256)
 3 - utf string
-4 - symbol (same as utf string)
-5 - regexp (same as utf string)
+4 - custom encoding string
+5 - symbol (same as utf string)
+6 - regexp (same as utf string)
  */
 
 /*
-string encodings:
-0 - custom:
-  0 - string end
-  1 - \t
-  2 - \n
-  3 - \r
-  95 - 32-126 ascii
-  (154) al,an,at,de,ea,ed,en,er,es,ha,he,hi,id,in,is,it,le,ly,nd,nt,of,on,ou,re,st,th,to,age,and,api,day,end,env,for,has,ing,ion,key,log,max,min,pay,per,row,tax,ter,the,url,ver,auth,body,card,code,cost,data,date,file,hour,href,html,http,info,item,link,ment,meta,mode,name,next,page,path,rate,role,sale,size,text,time,tion,type,unit,user,uuid,week,year,count,email,error,event,group,image,index,level,limit,order,param,phone,price,query,start,table,title,token,total,value,action,active,actual,amount,client,column,config,header,method,minute,number,offset,option,parent,result,second,source,status,string,target,address,balance,comment,content,created,decimal,deposit,expired,message,product,project,request,service,success,updated,version,category,complete,currency,discount,duration,location,password,quantity,settings,reference,timestamp,confidence,withdrawal,description,destination,transaction
-  255 - next - variant encoding utf code point
+string custom encoding:
+0 - string end
+(95) - 32-126 ascii
+(159) al,an,at,by,de,ed,en,er,es,id,in,is,it,le,ly,nd,nt,on,re,st,th,to,up,age,api,app,com,day,dis,end,env,for,has,ing,ion,key,log,max,min,new,num,pay,per,pro,ref,row,set,str,sub,sys,tag,tax,ter,url,ver,auth,body,code,cost,data,date,file,form,from,hour,info,item,last,link,list,main,ment,meta,mode,name,next,open,page,path,rate,role,size,text,time,type,unit,user,year,admin,count,email,error,event,first,group,image,index,level,limit,login,month,order,param,phone,price,query,start,state,table,title,token,total,value,access,action,active,amount,client,column,config,create,delete,device,header,method,minute,offset,option,parent,public,result,script,second,source,status,target,address,balance,content,current,decimal,default,expired,message,product,project,request,service,success,version,category,currency,duration,location,password,quantity,response,timestamp,transaction
+255 - next - variant encoding utf code point
  */
 
 /*
@@ -60,8 +56,8 @@ variation stream:
 0 - lower case
 1 - upper case
 2 - first letter upper
-3 - add _
-5 - add .
+3 - add at the end _
+4 - add at the end .
  */
 
 
@@ -91,6 +87,8 @@ primitive:
 // TODO: use little-endian
 // TODO: 2nd version: use FSE, code additional bits with context
 // TODO: compress only json without any extensions
+// TODO: try Huffman, than maybe MTF with map of previous byte (for more than 5 kb) or two bytes (for more than 1-5 Mb)
+// TODO: use Neural Context Mixing + ANS for max compression in the future
 // use dictionary for all (types dict (end) schemas (just ended), binary (number 0), binary (two-bites 0), string dict (empty string) strings)
 
 /*
