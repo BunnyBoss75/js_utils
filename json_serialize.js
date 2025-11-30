@@ -1,22 +1,55 @@
 /*
+header byte:
+00 - version 1
+version 1 header 6 bit:
+2 - if 0 - compressed to single block (raw json) next - byte - compression header
+- compression header next - will be the same to all blocks
+
+block header:
+4bit - type of block
+
+
+compression header byte:
+4bit - compression -
+  1 - store
+  2 - Palette Bit-Pack + Uniform Range Coder
+  3 - LZ4
+  4 - deflate
+  5 - LZP + uABS flags + FSE literals (fast)
+  6 - Adaptive Frequency Model (order 1,2) + rANS (fast PPM)
+  7 - MFT(0,1,2,3(hash)) + RLE + FSE/rANS (simple)
+  8 - LZ77 + rANS (custom deflate)
+  9 - BWT(block size, max 4mb) + MFT + RLE + FSE/rANS
+  10 - DMC + uABS (hard)
+  11 - LZMA custom (LZ77 + 7) (complicated)
+  12 - PPMd + rANS + Reciprocal Multiplication
+  13 - Context Mixing + uABS (hard)
+4bit - additional data for algorithm (if applicable)
+ */
+
+/*
 0 primitive
 1 string
 2 array (ending with end)
 3 array types equal (store size) (bytes the same for object ref)
 4 object (keys, values, ending with end)
 5 object ref (00 - key, 01 - key-types, 10 - key recursive, 11 - key-types recursive)
-6 store next value to schema/value list
 7 end
  */
 
 /*
+each stream - separate block with common header with type of block, compression algorithm and size
 streams:
-schema
+schema dict + end + schema
+just schema
 primitive tags
 string tags
 string variation
-binary dict + null + binary data (number/string/schema refs, numbers)
+binary dict + null + binary data
+just binary data
 string dict + null + string data
+just string data
+reference (schema/binary/string)
  */
 
 /*
