@@ -1,21 +1,23 @@
 const INT16_PAGE_SIZE = 8 * 1024;
+const INT8_PAGE_SIZE = 16 * 1024;
 
-class Integer16Reader {
-  constructor (pages, lastPage, size) {
+class IntegerReader {
+  constructor (pages, lastPage, size, pageSize) {
     this.pages = pages;
     this.lastPage = lastPage;
     this.size = size;
+    this.pageSize = pageSize;
 
     this.offset = 0;
     this.page = this.pages.length > 0 ? this.pages[0] : this.lastPage;
     this.pageIdx = this.pages.length > 0 ? 0 : -1;
-    this.currSize = this.pages.length > 0 ? INT16_PAGE_SIZE : size;
+    this.currSize = this.pages.length > 0 ? this.pageSize : size;
   }
 
   read() {
     if (this.offset === this.currSize) {
       if (this.pageIdx === -1) {
-        return null;
+        return -1;
       }
 
       this.offset = 0;
@@ -27,7 +29,7 @@ class Integer16Reader {
         this.currSize = this.size;
       } else {
         this.page = this.pages[this.pageIdx];
-        this.currSize = INT16_PAGE_SIZE;
+        this.currSize = this.pageSize;
       }
     }
 
@@ -35,11 +37,12 @@ class Integer16Reader {
   }
 }
 
-class Integer16Writer {
+class IntegerWriter {
   constructor(options) {
     this.totalSize = 0;
     this.size = 0;
-    this.page = new Uint16Array(INT16_PAGE_SIZE);
+    this.type = options.type || 16;
+    this.page = this.type === 16 ? new Uint16Array(INT16_PAGE_SIZE) : new Uint8Array(INT8_PAGE_SIZE);
     this.pages = [];
   }
 
@@ -54,7 +57,7 @@ class Integer16Writer {
 
   _expand() {
     this.pages.push(this.page);
-    this.page = new Uint16Array(INT16_PAGE_SIZE);
+    this.page = this.type === 16 ? new Uint16Array(INT16_PAGE_SIZE) : new Uint8Array(INT8_PAGE_SIZE);
     this.size = 0;
   }
 
@@ -85,10 +88,10 @@ class Integer16Writer {
   }
 
   getReader() {
-    return new Integer16Reader(this.pages, this.page, this.size);
+    return new IntegerReader(this.pages, this.page, this.size, this.type === 16 ? INT16_PAGE_SIZE : INT8_PAGE_SIZE);
   }
 }
 
 module.exports = {
-  Integer16Writer,
+  IntegerWriter,
 };

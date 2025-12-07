@@ -56,6 +56,7 @@ uABS - optimized bit ANS with static probability (1 byte number probability of 0
 /*
 0 primitive
 1 string
+2 bool
 2 array (ending with end)
 3 array types equal (store size) (bytes the same for object ref)
 4 object (keys, values, ending with end)
@@ -68,7 +69,10 @@ uABS - optimized bit ANS with static probability (1 byte number probability of 0
 /*
 each stream - separate block with common header with type of block, compression algorithm and size
 streams:
+schema dict + end + schema
 schema
+bool
+null mask
 primitive tags
 string tags
 string variation
@@ -80,8 +84,13 @@ reference (schema/binary/string)
  */
 
 /*
+bool values:
+false
+true
+ */
+
+/*
 primitive tags:
-0 - null
 1 - false
 2 - true
 3-7 - ZigZag 8,16,32,64,128 bit
@@ -95,7 +104,6 @@ primitive tags:
 
 /*
 string tags:
-0 - null
 1-2 - ref 8,16 bit (16 bit starts from 256)
 3 - utf string
 4 - custom encoding string
