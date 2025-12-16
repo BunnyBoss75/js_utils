@@ -57,12 +57,11 @@ uABS - optimized bit ANS with static probability (1 byte number probability of 0
 0 primitive
 1 string
 2 bool
-2 array (ending with end)
-3 array types equal (store size) (bytes the same for object ref)
-4 object (keys, values, ending with end)
-5 ref keys (obj) (n types followed)
-6 ref keys + types (obj or array) (just read schema from dictionary and only subtypes from stream)
-7 ref keys + types - recursive - full schema match
+3 array (ending with end)
+4 array types equal (store size) (bytes the same for object ref)
+5 object (keys, values, ending with end)
+6 ref keys (obj) (n types followed)
+7 ref keys + types (obj or array) (just read schema from dictionary and only subtypes from stream)
 8 end
  */
 
@@ -70,6 +69,7 @@ uABS - optimized bit ANS with static probability (1 byte number probability of 0
 each stream - separate block with common header with type of block, compression algorithm and size
 streams:
 schema dict + end + schema
+schema dict
 schema
 bool
 null mask
@@ -77,9 +77,11 @@ primitive tags
 string tags
 string variation
 binary dict + null + binary data
-just binary data
+binary dict
+binary data
 string dict + null + string data
-just string data
+string dict
+string data
 reference (schema/binary/string)
  */
 
@@ -129,7 +131,7 @@ variation stream:
  */
 
 // TODO: finish ideas with referencing schema
-
+// TODO: sort data in dictionaries to improve after compression
 // TODO: postgres variant for numbers (int, refs, maybe float)
 // TODO: use brotli dictionary for string compression
 // TODO: use little-endian
